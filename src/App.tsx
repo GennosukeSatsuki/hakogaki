@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   DndContext, 
   closestCenter,
@@ -213,6 +213,10 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  
+  // For long-press time picker
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const repeatInterval = useRef<NodeJS.Timeout | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -344,6 +348,35 @@ function App() {
       characterIds: newIds,
       characters: newString
     });
+  };
+
+  // Helper functions for time picker long-press
+  const clearTimers = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (repeatInterval.current) {
+      clearInterval(repeatInterval.current);
+      repeatInterval.current = null;
+    }
+  };
+
+  const handleTimeButtonPress = (action: () => void) => {
+    // Execute once immediately
+    action();
+    
+    // Start long-press timer (500ms delay before repeat starts)
+    longPressTimer.current = setTimeout(() => {
+      // Start repeating every 100ms
+      repeatInterval.current = setInterval(() => {
+        action();
+      }, 100);
+    }, 500);
+  };
+
+  const handleTimeButtonRelease = () => {
+    clearTimers();
   };
 
   const handleSaveFile = async () => {
@@ -661,13 +694,17 @@ function App() {
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           <button 
                             type="button"
-                            onClick={() => {
-                              const [datePart, timePart] = (editForm.time || '').split('T');
-                              const [hours, minutes] = (timePart || '12:00').split(':');
-                              const newHours = (parseInt(hours) + 1) % 24;
-                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
-                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            onMouseDown={() => {
+                              handleTimeButtonPress(() => {
+                                const [datePart, timePart] = (editForm.time || '').split('T');
+                                const [hours, minutes] = (timePart || '12:00').split(':');
+                                const newHours = (parseInt(hours) + 1) % 24;
+                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
+                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                              });
                             }}
+                            onMouseUp={handleTimeButtonRelease}
+                            onMouseLeave={handleTimeButtonRelease}
                             style={{ 
                               padding: '2px', 
                               fontSize: '0.7rem', 
@@ -691,13 +728,17 @@ function App() {
                           </div>
                           <button 
                             type="button"
-                            onClick={() => {
-                              const [datePart, timePart] = (editForm.time || '').split('T');
-                              const [hours, minutes] = (timePart || '12:00').split(':');
-                              const newHours = (parseInt(hours) - 1 + 24) % 24;
-                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
-                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            onMouseDown={() => {
+                              handleTimeButtonPress(() => {
+                                const [datePart, timePart] = (editForm.time || '').split('T');
+                                const [hours, minutes] = (timePart || '12:00').split(':');
+                                const newHours = (parseInt(hours) - 1 + 24) % 24;
+                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
+                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                              });
                             }}
+                            onMouseUp={handleTimeButtonRelease}
+                            onMouseLeave={handleTimeButtonRelease}
                             style={{ 
                               padding: '2px', 
                               fontSize: '0.7rem', 
@@ -716,13 +757,17 @@ function App() {
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           <button 
                             type="button"
-                            onClick={() => {
-                              const [datePart, timePart] = (editForm.time || '').split('T');
-                              const [hours, minutes] = (timePart || '12:00').split(':');
-                              const newMinutes = (parseInt(minutes) + 1) % 60;
-                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
-                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            onMouseDown={() => {
+                              handleTimeButtonPress(() => {
+                                const [datePart, timePart] = (editForm.time || '').split('T');
+                                const [hours, minutes] = (timePart || '12:00').split(':');
+                                const newMinutes = (parseInt(minutes) + 1) % 60;
+                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
+                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                              });
                             }}
+                            onMouseUp={handleTimeButtonRelease}
+                            onMouseLeave={handleTimeButtonRelease}
                             style={{ 
                               padding: '2px', 
                               fontSize: '0.7rem', 
@@ -746,13 +791,17 @@ function App() {
                           </div>
                           <button 
                             type="button"
-                            onClick={() => {
-                              const [datePart, timePart] = (editForm.time || '').split('T');
-                              const [hours, minutes] = (timePart || '12:00').split(':');
-                              const newMinutes = (parseInt(minutes) - 1 + 60) % 60;
-                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
-                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            onMouseDown={() => {
+                              handleTimeButtonPress(() => {
+                                const [datePart, timePart] = (editForm.time || '').split('T');
+                                const [hours, minutes] = (timePart || '12:00').split(':');
+                                const newMinutes = (parseInt(minutes) - 1 + 60) % 60;
+                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
+                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                              });
                             }}
+                            onMouseUp={handleTimeButtonRelease}
+                            onMouseLeave={handleTimeButtonRelease}
                             style={{ 
                               padding: '2px', 
                               fontSize: '0.7rem', 
