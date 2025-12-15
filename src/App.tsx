@@ -32,6 +32,7 @@ interface Scene {
   chapter: string; // 章タイトル
   characters: string; // 登場人物
   time: string; // 時間
+  place: string; // 場所
   aim: string; // 狙いと役割
   summary: string; // 詳細なあらすじ
   note: string; // 裏設定
@@ -43,6 +44,7 @@ const INITIAL_SCENE: Scene = {
   chapter: '第1章',
   characters: '主人公, ヒロイン',
   time: '夕方',
+  place: '通学路',
   aim: '主人公の日常と、非日常への入り口を描写する',
   summary: '主人公は学校からの帰り道、不思議な光を目撃する。好奇心から近づくと、そこで倒れているヒロインを発見する。',
   note: '実はこの時すでに敵組織に見つかっている',
@@ -104,6 +106,13 @@ function SortableSceneCard({ scene, onClick, isHiddenFull }: SortableSceneCardPr
         <span className="value">{scene.characters || '-'}</span>
       </div>
 
+      {(scene.time || scene.place) && (
+        <div className="card-row">
+           <span className="label">場所・時</span>
+           <span className="value">{(scene.place || '-') + ' / ' + (scene.time || '-')}</span>
+        </div>
+      )}
+
       <div className="card-row">
         <span className="label">狙い</span>
         <span className="value">{scene.aim || '-'}</span>
@@ -134,6 +143,12 @@ function SceneCardOverlay({ scene }: { scene: Scene }) {
         <span className="label">登場人物</span>
         <span className="value">{scene.characters || '-'}</span>
       </div>
+      {(scene.time || scene.place) && (
+        <div className="card-row">
+           <span className="label">場所・時</span>
+           <span className="value">{(scene.place || '-') + ' / ' + (scene.time || '-')}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -182,6 +197,7 @@ function App() {
       chapter: '',
       characters: '',
       time: '',
+      place: '',
       aim: '',
       summary: '',
       note: '',
@@ -322,7 +338,8 @@ function App() {
         const filePath = `${folderPath}${sep}${fileName}`;
 
         // Create Content
-        const content = `**時間** ${scene.time}
+        const content = `**場所** ${scene.place}
+**時間** ${scene.time}
 
 **登場人物** ${scene.characters}
 
@@ -447,6 +464,14 @@ function App() {
                     value={editForm.time} 
                     onChange={e => handleInputChange('time', e.target.value)} 
                     placeholder="昼、夕方など"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>場所</label>
+                  <input 
+                    value={editForm.place || ''} 
+                    onChange={e => handleInputChange('place', e.target.value)} 
+                    placeholder="教室、公園など"
                   />
                 </div>
               </div>
