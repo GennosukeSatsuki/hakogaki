@@ -633,7 +633,7 @@ function App() {
                 <div className="form-group">
                   <label>時間</label>
                   {settings.timeInputMode === 'datetime' ? (
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
                       <input 
                         type="date"
                         value={editForm.time ? editForm.time.split('T')[0] : ''} 
@@ -648,20 +648,123 @@ function App() {
                         }} 
                         style={{ flex: 1 }}
                       />
-                      <input 
-                        type="time"
-                        value={editForm.time?.includes('T') ? editForm.time.split('T')[1] : ''} 
-                        onChange={e => {
-                          const currentDate = editForm.time?.split('T')[0] || new Date().toISOString().split('T')[0];
-                          const newDateTime = `${currentDate}T${e.target.value}`;
-                          setEditForm({
-                            ...editForm,
-                            time: newDateTime,
-                            timeMode: 'datetime'
-                          });
-                        }} 
-                        style={{ flex: 1 }}
-                      />
+                      <div style={{ 
+                        flex: 1, 
+                        display: 'flex', 
+                        gap: '0.25rem',
+                        backgroundColor: 'var(--bg-input)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '0.25rem'
+                      }}>
+                        {/* Hours */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const [datePart, timePart] = (editForm.time || '').split('T');
+                              const [hours, minutes] = (timePart || '12:00').split(':');
+                              const newHours = (parseInt(hours) + 1) % 24;
+                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
+                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            }}
+                            style={{ 
+                              padding: '2px', 
+                              fontSize: '0.7rem', 
+                              backgroundColor: 'var(--bg-hover)',
+                              border: '1px solid var(--border-subtle)',
+                              borderRadius: '2px',
+                              cursor: 'pointer',
+                              color: 'var(--text-main)'
+                            }}
+                          >▲</button>
+                          <div style={{ 
+                            flex: 1, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                            fontWeight: '600',
+                            color: 'var(--text-main)'
+                          }}>
+                            {editForm.time?.includes('T') ? editForm.time.split('T')[1].split(':')[0] : '12'}
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const [datePart, timePart] = (editForm.time || '').split('T');
+                              const [hours, minutes] = (timePart || '12:00').split(':');
+                              const newHours = (parseInt(hours) - 1 + 24) % 24;
+                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
+                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            }}
+                            style={{ 
+                              padding: '2px', 
+                              fontSize: '0.7rem', 
+                              backgroundColor: 'var(--bg-hover)',
+                              border: '1px solid var(--border-subtle)',
+                              borderRadius: '2px',
+                              cursor: 'pointer',
+                              color: 'var(--text-main)'
+                            }}
+                          >▼</button>
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', color: 'var(--text-main)', fontSize: '1.2rem' }}>:</div>
+                        
+                        {/* Minutes */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const [datePart, timePart] = (editForm.time || '').split('T');
+                              const [hours, minutes] = (timePart || '12:00').split(':');
+                              const newMinutes = (parseInt(minutes) + 1) % 60;
+                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
+                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            }}
+                            style={{ 
+                              padding: '2px', 
+                              fontSize: '0.7rem', 
+                              backgroundColor: 'var(--bg-hover)',
+                              border: '1px solid var(--border-subtle)',
+                              borderRadius: '2px',
+                              cursor: 'pointer',
+                              color: 'var(--text-main)'
+                            }}
+                          >▲</button>
+                          <div style={{ 
+                            flex: 1, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                            fontWeight: '600',
+                            color: 'var(--text-main)'
+                          }}>
+                            {editForm.time?.includes('T') ? editForm.time.split('T')[1].split(':')[1] : '00'}
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const [datePart, timePart] = (editForm.time || '').split('T');
+                              const [hours, minutes] = (timePart || '12:00').split(':');
+                              const newMinutes = (parseInt(minutes) - 1 + 60) % 60;
+                              const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
+                              setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                            }}
+                            style={{ 
+                              padding: '2px', 
+                              fontSize: '0.7rem', 
+                              backgroundColor: 'var(--bg-hover)',
+                              border: '1px solid var(--border-subtle)',
+                              borderRadius: '2px',
+                              cursor: 'pointer',
+                              color: 'var(--text-main)'
+                            }}
+                          >▼</button>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <input 
