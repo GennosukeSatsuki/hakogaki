@@ -696,11 +696,14 @@ function App() {
                             type="button"
                             onMouseDown={() => {
                               handleTimeButtonPress(() => {
-                                const [datePart, timePart] = (editForm.time || '').split('T');
-                                const [hours, minutes] = (timePart || '12:00').split(':');
-                                const newHours = (parseInt(hours) + 1) % 24;
-                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
-                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                                setEditForm(prev => {
+                                  if (!prev) return prev;
+                                  const [datePart, timePart] = (prev.time || '').split('T');
+                                  const [hours, minutes] = (timePart || '12:00').split(':');
+                                  const newHours = (parseInt(hours) + 1) % 24;
+                                  const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
+                                  return { ...prev, time: newTime, timeMode: 'datetime' };
+                                });
                               });
                             }}
                             onMouseUp={handleTimeButtonRelease}
@@ -730,11 +733,14 @@ function App() {
                             type="button"
                             onMouseDown={() => {
                               handleTimeButtonPress(() => {
-                                const [datePart, timePart] = (editForm.time || '').split('T');
-                                const [hours, minutes] = (timePart || '12:00').split(':');
-                                const newHours = (parseInt(hours) - 1 + 24) % 24;
-                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
-                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                                setEditForm(prev => {
+                                  if (!prev) return prev;
+                                  const [datePart, timePart] = (prev.time || '').split('T');
+                                  const [hours, minutes] = (timePart || '12:00').split(':');
+                                  const newHours = (parseInt(hours) - 1 + 24) % 24;
+                                  const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${String(newHours).padStart(2, '0')}:${minutes}`;
+                                  return { ...prev, time: newTime, timeMode: 'datetime' };
+                                });
                               });
                             }}
                             onMouseUp={handleTimeButtonRelease}
@@ -759,11 +765,14 @@ function App() {
                             type="button"
                             onMouseDown={() => {
                               handleTimeButtonPress(() => {
-                                const [datePart, timePart] = (editForm.time || '').split('T');
-                                const [hours, minutes] = (timePart || '12:00').split(':');
-                                const newMinutes = (parseInt(minutes) + 1) % 60;
-                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
-                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                                setEditForm(prev => {
+                                  if (!prev) return prev;
+                                  const [datePart, timePart] = (prev.time || '').split('T');
+                                  const [hours, minutes] = (timePart || '12:00').split(':');
+                                  const newMinutes = (parseInt(minutes) + 1) % 60;
+                                  const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
+                                  return { ...prev, time: newTime, timeMode: 'datetime' };
+                                });
                               });
                             }}
                             onMouseUp={handleTimeButtonRelease}
@@ -793,11 +802,14 @@ function App() {
                             type="button"
                             onMouseDown={() => {
                               handleTimeButtonPress(() => {
-                                const [datePart, timePart] = (editForm.time || '').split('T');
-                                const [hours, minutes] = (timePart || '12:00').split(':');
-                                const newMinutes = (parseInt(minutes) - 1 + 60) % 60;
-                                const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
-                                setEditForm({ ...editForm, time: newTime, timeMode: 'datetime' });
+                                setEditForm(prev => {
+                                  if (!prev) return prev;
+                                  const [datePart, timePart] = (prev.time || '').split('T');
+                                  const [hours, minutes] = (timePart || '12:00').split(':');
+                                  const newMinutes = (parseInt(minutes) - 1 + 60) % 60;
+                                  const newTime = `${datePart || new Date().toISOString().split('T')[0]}T${hours}:${String(newMinutes).padStart(2, '0')}`;
+                                  return { ...prev, time: newTime, timeMode: 'datetime' };
+                                });
                               });
                             }}
                             onMouseUp={handleTimeButtonRelease}
