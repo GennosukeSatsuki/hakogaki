@@ -633,17 +633,34 @@ function App() {
                 <div className="form-group">
                   <label>時間</label>
                   {settings.timeInputMode === 'datetime' ? (
-                    <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input 
-                        type="datetime-local"
-                        value={editForm.time || ''} 
+                        type="date"
+                        value={editForm.time ? editForm.time.split('T')[0] : ''} 
                         onChange={e => {
+                          const currentTime = editForm.time?.includes('T') ? editForm.time.split('T')[1] : '12:00';
+                          const newDateTime = e.target.value ? `${e.target.value}T${currentTime}` : '';
                           setEditForm({
                             ...editForm,
-                            time: e.target.value,
+                            time: newDateTime,
                             timeMode: 'datetime'
                           });
                         }} 
+                        style={{ flex: 1 }}
+                      />
+                      <input 
+                        type="time"
+                        value={editForm.time?.includes('T') ? editForm.time.split('T')[1] : ''} 
+                        onChange={e => {
+                          const currentDate = editForm.time?.split('T')[0] || new Date().toISOString().split('T')[0];
+                          const newDateTime = `${currentDate}T${e.target.value}`;
+                          setEditForm({
+                            ...editForm,
+                            time: newDateTime,
+                            timeMode: 'datetime'
+                          });
+                        }} 
+                        style={{ flex: 1 }}
                       />
                     </div>
                   ) : (
