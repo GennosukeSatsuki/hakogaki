@@ -261,7 +261,20 @@ function App() {
 
   const startEditing = (scene: Scene) => {
     setEditingId(scene.id);
-    setEditForm({ ...scene });
+    let editableScene = { ...scene };
+    
+    // If in datetime mode and time is not in ISO format, try to convert or set to current time
+    if (settings.timeInputMode === 'datetime' && editableScene.time) {
+      // Check if already in ISO format (contains 'T')
+      if (!editableScene.time.includes('T')) {
+        // Not in ISO format, set to current time as default
+        const now = new Date();
+        editableScene.time = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+        editableScene.timeMode = 'datetime';
+      }
+    }
+    
+    setEditForm(editableScene);
   };
 
   const saveScene = () => {
@@ -622,18 +635,24 @@ function App() {
                   {settings.timeInputMode === 'datetime' ? (
                     <input 
                       type="datetime-local"
-                      value={editForm.time} 
+                      value={editForm.time || ''} 
                       onChange={e => {
-                        handleInputChange('time', e.target.value);
-                        handleInputChange('timeMode', 'datetime');
+                        setEditForm({
+                          ...editForm,
+                          time: e.target.value,
+                          timeMode: 'datetime'
+                        });
                       }} 
                     />
                   ) : (
                     <input 
-                      value={editForm.time} 
+                      value={editForm.time || ''} 
                       onChange={e => {
-                        handleInputChange('time', e.target.value);
-                        handleInputChange('timeMode', 'text');
+                        setEditForm({
+                          ...editForm,
+                          time: e.target.value,
+                          timeMode: 'text'
+                        });
                       }} 
                       placeholder="昼、夕方など"
                     />
