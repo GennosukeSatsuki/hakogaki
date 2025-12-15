@@ -18,7 +18,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { save, open } from '@tauri-apps/plugin-dialog';
+import { save, open, message, ask } from '@tauri-apps/plugin-dialog';
 
 import { writeTextFile, readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 
@@ -182,6 +182,7 @@ function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Scene | null>(null);
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false); // For character management modal
+  const [newCharacterName, setNewCharacterName] = useState(''); // For adding new character
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
 
@@ -261,10 +262,10 @@ function App() {
   };
 
   // Character Management Handlers
-  const addCharacter = () => {
-    const name = prompt('登場人物の名前を入力してください');
-    if (name) {
-      setCharacters([...characters, { id: crypto.randomUUID(), name }]);
+  const addCharacter = async () => {
+    if (newCharacterName && newCharacterName.trim()) {
+      setCharacters(prev => [...prev, { id: crypto.randomUUID(), name: newCharacterName.trim() }]);
+      setNewCharacterName(''); // Clear input
     }
   };
 
@@ -272,8 +273,9 @@ function App() {
     setCharacters(characters.map(c => c.id === id ? { ...c, name } : c));
   };
   
-  const deleteCharacter = (id: string) => {
-    if (confirm('この登場人物を削除しますか？')) {
+  const deleteCharacter = async (id: string) => {
+    const confirmed = await ask('この登場人物を削除しますか？', { title: '確認', kind: 'warning' });
+    if (confirmed) {
       setCharacters(characters.filter(c => c.id !== id));
       // Remove from scenes as well
       setScenes(scenes.map(s => ({
@@ -672,8 +674,8 @@ function App() {
 
       {/* Character Management Modal */}
       {isCharacterMenuOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
+        <div className="modal-overlay" onClick={() => setIsCharacterMenuOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>登場人物設定</h2>
               <button className="close-btn" onClick={() => setIsCharacterMenuOpen(false)}>✕</button>
@@ -685,16 +687,24 @@ function App() {
                      <input 
                        value={char.name}
                        onChange={(e) => updateCharacter(char.id, e.target.value)}
+                       onClick={(e) => e.stopPropagation()}
                        style={{ flex: 1 }}
                      />
-                     <button className="delete-btn" onClick={() => deleteCharacter(char.id)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>削除</button>
+                     <button type="button" className="delete-btn" onClick={() => deleteCharacter(char.id)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>削除</button>
                    </li>
                  ))}
                </ul>
-               <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-                 <button onClick={addCharacter}>+ 追加</button>
-                 <div style={{ flex: 1 }}></div>
-                 <button className="primary" onClick={() => setIsCharacterMenuOpen(false)}>閉じる</button>
+               <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                 <input 
+                   type="text"
+                   value={newCharacterName}
+                   onChange={(e) => setNewCharacterName(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Enter') addCharacter(); }}
+                   placeholder="新しい登場人物の名前"
+                   style={{ flex: 1 }}
+                 />
+                 <button type="button" onClick={() => addCharacter()}>追加</button>
+                 <button type="button" className="primary" onClick={() => setIsCharacterMenuOpen(false)}>閉じる</button>
                </div>
             </div>
           </div>
