@@ -32,7 +32,8 @@ interface Scene {
   chapter: string; // 章タイトル
   characters: string; // 登場人物 (Deprecated: for display/compatibility)
   characterIds?: string[]; // 登場人物IDリスト (New)
-  time: string; // 時間
+  time: string; // 時間 (text or ISO datetime)
+  timeMode?: 'text' | 'datetime'; // How time was entered
   place: string; // 場所
   aim: string; // 狙いと役割
   summary: string; // 詳細なあらすじ
@@ -44,10 +45,15 @@ interface Character {
   name: string;
 }
 
+interface AppSettings {
+  timeInputMode: 'text' | 'datetime';
+}
+
 // Data structure for saving/loading
 interface StoryData {
   scenes: Scene[];
   characters: Character[];
+  settings?: AppSettings;
 }
 
 const INITIAL_SCENE: Scene = {
@@ -173,6 +179,26 @@ function SceneCardOverlay({ scene, characterList }: { scene: Scene, characterLis
 }
 
 
+// Helper function to format datetime for display
+const formatTimeForDisplay = (time: string, mode?: 'text' | 'datetime'): string => {
+  if (!time) return '-';
+  if (mode === 'datetime') {
+    try {
+      const date = new Date(time);
+      return date.toLocaleString('ja-JP', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch {
+      return time;
+    }
+  }
+  return time;
+};
+
 function App() {
   const [scenes, setScenes] = useState<Scene[]>([INITIAL_SCENE]);
   const [characters, setCharacters] = useState<Character[]>([
@@ -183,6 +209,8 @@ function App() {
   const [editForm, setEditForm] = useState<Scene | null>(null);
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false); // For character management modal
   const [newCharacterName, setNewCharacterName] = useState(''); // For adding new character
+  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text' });
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
 
@@ -317,7 +345,7 @@ function App() {
       
       
       if (path) {
-        const data: StoryData = { scenes, characters };
+        const data: StoryData = { scenes, characters, settings };
         await writeTextFile(path, JSON.stringify(data, null, 2));
         alert('保存しました');
       }
@@ -381,6 +409,9 @@ function App() {
           // New format
           setScenes(parsed.scenes);
           setCharacters(parsed.characters);
+          if (parsed.settings) {
+            setSettings(parsed.settings);
+          }
           alert('読み込みました');
         } else {
           alert('ファイル形式が正しくありません');
@@ -452,7 +483,7 @@ function App() {
 
         // Create Content
         const content = `**場所** ${scene.place}
-**時間** ${scene.time}
+**時間** ${formatTimeForDisplay(scene.time, scene.timeMode)}
 
 **登場人物** ${scene.characterIds?.map(id => characters.find(c => c.id === id)?.name).filter(Boolean).join(', ') || scene.characters}
 
@@ -519,6 +550,13 @@ function App() {
         <div className="actions">
           <button 
             className="secondary" 
+            onClick={() => setIsSettingsOpen(true)}
+            style={{ marginRight: '0.5rem' }}
+          >
+            ⚙️ 設定
+          </button>
+          <button 
+            className="secondary" 
             onClick={() => setIsCharacterMenuOpen(true)}
             style={{ marginRight: '0.5rem' }}
           >
@@ -581,11 +619,25 @@ function App() {
                 </div>
                 <div className="form-group">
                   <label>時間</label>
-                  <input 
-                    value={editForm.time} 
-                    onChange={e => handleInputChange('time', e.target.value)} 
-                    placeholder="昼、夕方など"
-                  />
+                  {settings.timeInputMode === 'datetime' ? (
+                    <input 
+                      type="datetime-local"
+                      value={editForm.time} 
+                      onChange={e => {
+                        handleInputChange('time', e.target.value);
+                        handleInputChange('timeMode', 'datetime');
+                      }} 
+                    />
+                  ) : (
+                    <input 
+                      value={editForm.time} 
+                      onChange={e => {
+                        handleInputChange('time', e.target.value);
+                        handleInputChange('timeMode', 'text');
+                      }} 
+                      placeholder="昼、夕方など"
+                    />
+                  )}
                 </div>
                 <div className="form-group">
                   <label>場所</label>
@@ -706,6 +758,45 @@ function App() {
                  <button type="button" onClick={() => addCharacter()}>追加</button>
                  <button type="button" className="primary" onClick={() => setIsCharacterMenuOpen(false)}>閉じる</button>
                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>設定</h2>
+              <button className="close-btn" onClick={() => setIsSettingsOpen(false)}>✕</button>
+            </div>
+            <div className="edit-form">
+              <div className="form-group">
+                <label>時間入力モード</label>
+                <select 
+                  value={settings.timeInputMode}
+                  onChange={(e) => setSettings({ ...settings, timeInputMode: e.target.value as 'text' | 'datetime' })}
+                  style={{ 
+                    backgroundColor: 'var(--bg-input)', 
+                    color: 'var(--text-main)', 
+                    border: '1px solid var(--border-subtle)',
+                    padding: '0.5rem',
+                    borderRadius: 'var(--radius-sm)',
+                    width: '100%'
+                  }}
+                >
+                  <option value="text">テキスト入力（例：昼、夕方）</option>
+                  <option value="datetime">日時選択（カレンダー＋時計）</option>
+                </select>
+                <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                  日時選択モードでは、カレンダーと時計で正確な日時を設定できます。
+                  書き出し時は読みやすい形式に変換されます。
+                </small>
+              </div>
+              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="primary" onClick={() => setIsSettingsOpen(false)}>閉じる</button>
+              </div>
             </div>
           </div>
         </div>
