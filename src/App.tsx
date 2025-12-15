@@ -20,7 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { save, open } from '@tauri-apps/plugin-dialog';
 
-import { writeTextFile, readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { writeTextFile, readTextFile, mkdir } from '@tauri-apps/plugin-fs';
 
 import './App.css';
 
