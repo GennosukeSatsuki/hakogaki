@@ -132,7 +132,7 @@ function SortableSceneCard({ scene, characterList, onClick, isHiddenFull }: Sort
       {(scene.time || scene.place) && (
         <div className="card-row">
            <span className="label">場所・時</span>
-           <span className="value">{(scene.place || '-') + ' / ' + (scene.time || '-')}</span>
+           <span className="value">{(scene.place || '-') + ' / ' + formatTimeForDisplay(scene.time, scene.timeMode)}</span>
         </div>
       )}
 
@@ -171,7 +171,7 @@ function SceneCardOverlay({ scene, characterList }: { scene: Scene, characterLis
       {(scene.time || scene.place) && (
         <div className="card-row">
            <span className="label">場所・時</span>
-           <span className="value">{(scene.place || '-') + ' / ' + (scene.time || '-')}</span>
+           <span className="value">{(scene.place || '-') + ' / ' + formatTimeForDisplay(scene.time, scene.timeMode)}</span>
         </div>
       )}
     </div>
