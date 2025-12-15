@@ -115,12 +115,10 @@ function SortableSceneCard({ scene, characterList, onClick, isHiddenFull }: Sort
         <span className="scene-title">{scene.title || '(無題)'}</span>
       </div>
       
-      {scene.chapter && (
-        <div className="card-row">
-          <span className="label">章</span>
-          <span className="value strong">{scene.chapter}</span>
-        </div>
-      )}
+      <div className="card-row">
+        <span className="label">章</span>
+        <span className="value strong">{scene.chapter || '-'}</span>
+      </div>
       
       <div className="card-row">
         <span className="label">登場人物</span>
@@ -129,12 +127,10 @@ function SortableSceneCard({ scene, characterList, onClick, isHiddenFull }: Sort
         </span>
       </div>
 
-      {(scene.time || scene.place) && (
-        <div className="card-row">
-           <span className="label">場所・時</span>
-           <span className="value">{(scene.place || '-') + ' / ' + formatTimeForDisplay(scene.time, scene.timeMode)}</span>
-        </div>
-      )}
+      <div className="card-row">
+         <span className="label">場所・時</span>
+         <span className="value">{(scene.place || '-') + ' / ' + formatTimeForDisplay(scene.time, scene.timeMode)}</span>
+      </div>
 
       <div className="card-row">
         <span className="label">狙い</span>
@@ -156,24 +152,20 @@ function SceneCardOverlay({ scene, characterList }: { scene: Scene, characterLis
        <div className="card-header">
         <span className="scene-title">{scene.title || '(無題)'}</span>
       </div>
-      {scene.chapter && (
-        <div className="card-row">
-          <span className="label">章</span>
-          <span className="value strong">{scene.chapter}</span>
-        </div>
-      )}
+      <div className="card-row">
+        <span className="label">章</span>
+        <span className="value strong">{scene.chapter || '-'}</span>
+      </div>
       <div className="card-row">
         <span className="label">登場人物</span>
         <span className="value">
           {scene.characterIds?.map(id => characterList.find(c => c.id === id)?.name).filter(Boolean).join(', ') || scene.characters || '-'}
         </span>
       </div>
-      {(scene.time || scene.place) && (
-        <div className="card-row">
-           <span className="label">場所・時</span>
-           <span className="value">{(scene.place || '-') + ' / ' + formatTimeForDisplay(scene.time, scene.timeMode)}</span>
-        </div>
-      )}
+      <div className="card-row">
+         <span className="label">場所・時</span>
+         <span className="value">{(scene.place || '-') + ' / ' + formatTimeForDisplay(scene.time, scene.timeMode)}</span>
+      </div>
     </div>
   );
 }
