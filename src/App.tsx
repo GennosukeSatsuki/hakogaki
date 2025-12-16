@@ -407,8 +407,8 @@ function App() {
     try {
       const path = await save({
         filters: [{
-          name: 'Hakogaki File',
-          extensions: ['hako']
+          name: 'Hakogaki Data (JSON)',
+          extensions: ['json']
         }]
       });
       
@@ -431,8 +431,8 @@ function App() {
         multiple: false,
         directory: false,
         filters: [{
-          name: 'Hakogaki File',
-          extensions: ['hako', 'json'] // Allow reading both for compatibility
+          name: 'Hakogaki Data (JSON)',
+          extensions: ['json', 'hako']
         }]
       });
       
