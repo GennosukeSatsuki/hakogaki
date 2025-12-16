@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   DndContext, 
   closestCenter,
@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { save, open, ask } from '@tauri-apps/plugin-dialog';
 
 import { writeTextFile, readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { getVersion } from '@tauri-apps/api/app';
 
 import './App.css';
 
@@ -29,7 +30,8 @@ import './App.css';
 interface Scene {
   id: string;
   title: string; // シーンタイトル
-  chapter: string; // 章タイトル
+  chapter: string; // 章タイトル (Deprecated: for display/compatibility)
+  chapterId?: string; // 章ID (New)
   characters: string; // 登場人物 (Deprecated: for display/compatibility)
   characterIds?: string[]; // 登場人物IDリスト (New)
   time: string; // 時間 (text or ISO datetime)
@@ -50,9 +52,15 @@ interface Location {
   name: string;
 }
 
+interface Chapter {
+  id: string;
+  title: string;
+}
+
 interface AppSettings {
   timeInputMode: 'text' | 'datetime';
   placeInputMode: 'text' | 'select';
+  autoSave: boolean;
 }
 
 // Data structure for saving/loading
@@ -60,6 +68,7 @@ interface StoryData {
   scenes: Scene[];
   characters: Character[];
   locations?: Location[];
+  chapters?: Chapter[];
   settings?: AppSettings;
 }
 
@@ -67,6 +76,7 @@ const INITIAL_SCENE: Scene = {
   id: '1',
   title: '物語の始まり',
   chapter: '第1章',
+  chapterId: '1',
   characters: '主人公, ヒロイン',
   characterIds: ['1', '2'],
   time: '夕方',
@@ -81,11 +91,12 @@ const INITIAL_SCENE: Scene = {
 interface SortableSceneCardProps {
   scene: Scene;
   characterList: Character[];
+  chapterList: Chapter[];
   onClick: (scene: Scene) => void;
   isHiddenFull?: boolean; // For DragOverlay
 }
 
-function SortableSceneCard({ scene, characterList, onClick, isHiddenFull }: SortableSceneCardProps) {
+function SortableSceneCard({ scene, characterList, chapterList, onClick, isHiddenFull }: SortableSceneCardProps) {
   const {
     attributes,
     listeners,
@@ -124,7 +135,9 @@ function SortableSceneCard({ scene, characterList, onClick, isHiddenFull }: Sort
       
       <div className="card-row">
         <span className="label">章</span>
-        <span className="value strong">{scene.chapter || '-'}</span>
+        <span className="value strong">
+          {scene.chapterId ? chapterList.find(c => c.id === scene.chapterId)?.title : (scene.chapter || '-')}
+        </span>
       </div>
       
       <div className="card-row">
@@ -153,7 +166,7 @@ function SortableSceneCard({ scene, characterList, onClick, isHiddenFull }: Sort
 }
 
 // Plain component for DragOverlay
-function SceneCardOverlay({ scene, characterList }: { scene: Scene, characterList: Character[] }) {
+function SceneCardOverlay({ scene, characterList, chapterList }: { scene: Scene, characterList: Character[], chapterList: Chapter[] }) {
   return (
     <div className="scene-card" style={{ cursor: 'grabbing', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
        <div className="card-header">
@@ -161,7 +174,9 @@ function SceneCardOverlay({ scene, characterList }: { scene: Scene, characterLis
       </div>
       <div className="card-row">
         <span className="label">章</span>
-        <span className="value strong">{scene.chapter || '-'}</span>
+        <span className="value strong">
+          {scene.chapterId ? chapterList.find(c => c.id === scene.chapterId)?.title : (scene.chapter || '-')}
+        </span>
       </div>
       <div className="card-row">
         <span className="label">登場人物</span>
@@ -207,14 +222,23 @@ function App() {
   const [locations, setLocations] = useState<Location[]>([
     { id: '1', name: '通学路' },
   ]);
+  const [chapters, setChapters] = useState<Chapter[]>([
+    { id: '1', title: '第1章' },
+  ]);
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Scene | null>(null);
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false); // For character management modal
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false); // For location management modal
+  const [isChapterMenuOpen, setIsChapterMenuOpen] = useState(false); // For chapter management modal
   const [newCharacterName, setNewCharacterName] = useState(''); // For adding new character
   const [newLocationName, setNewLocationName] = useState(''); // For adding new location
-  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text', placeInputMode: 'text' });
+  const [newChapterTitle, setNewChapterTitle] = useState(''); // For adding new chapter
+  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text', placeInputMode: 'text', autoSave: false });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   
@@ -373,6 +397,27 @@ function App() {
     }
   };
 
+  // Chapter Management Handlers
+  const addChapter = async () => {
+    if (newChapterTitle && newChapterTitle.trim()) {
+      setChapters(prev => [...prev, { id: crypto.randomUUID(), title: newChapterTitle.trim() }]);
+      setNewChapterTitle(''); // Clear input
+    }
+  };
+
+  const updateChapter = (id: string, title: string) => {
+    setChapters(chapters.map(c => c.id === id ? { ...c, title } : c));
+  };
+  
+  const deleteChapter = async (id: string) => {
+    const confirmed = await ask('この章を削除しますか？\n（使用中のシーンの章設定は解除されます）', { title: '確認', kind: 'warning' });
+    if (confirmed) {
+      setChapters(chapters.filter(c => c.id !== id));
+      // Remove from scenes as well
+      setScenes(scenes.map(s => s.chapterId === id ? { ...s, chapterId: undefined, chapter: '' } : s));
+    }
+  };
+
   // Helper functions for time picker long-press
   const clearTimers = () => {
     if (longPressTimer.current) {
@@ -402,7 +447,7 @@ function App() {
     clearTimers();
   };
 
-  const handleSaveFile = async () => {
+  const handleSaveAs = async () => {
     setIsFileMenuOpen(false);
     try {
       const path = await save({
@@ -412,10 +457,10 @@ function App() {
         }]
       });
       
-      
       if (path) {
-        const data: StoryData = { scenes, characters, locations, settings };
+        const data: StoryData = { scenes, characters, locations, chapters, settings };
         await writeTextFile(path, JSON.stringify(data, null, 2));
+        setCurrentFilePath(path);
         alert('保存しました');
       }
     } catch (e) {
@@ -423,6 +468,35 @@ function App() {
       alert('保存に失敗しました: ' + e);
     }
   };
+
+  const handleOverwriteSave = async (silent = false) => {
+    setIsFileMenuOpen(false);
+    if (!currentFilePath) {
+      if (!silent) handleSaveAs();
+      return;
+    }
+
+    try {
+      const data: StoryData = { scenes, characters, locations, chapters, settings };
+      await writeTextFile(currentFilePath, JSON.stringify(data, null, 2));
+      if (!silent) alert('上書き保存しました');
+      else console.log('Auto saved');
+    } catch (e) {
+      console.error(e);
+      if (!silent) alert('保存に失敗しました: ' + e);
+    }
+  };
+
+  // Auto Save Effect
+  useEffect(() => {
+    if (!settings.autoSave || !currentFilePath) return;
+
+    const timer = setTimeout(() => {
+      handleOverwriteSave(true);
+    }, 2000); // 2 seconds debounce
+
+    return () => clearTimeout(timer);
+  }, [scenes, characters, locations, chapters, settings, currentFilePath]);
 
   const handleLoadFile = async () => {
     setIsFileMenuOpen(false);
@@ -438,6 +512,7 @@ function App() {
       
       if (file) {
         // file is string if multiple is false
+        setCurrentFilePath(file);
         const content = await readTextFile(file);
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed)) {
@@ -473,11 +548,54 @@ function App() {
 
           setScenes(newScenes);
           setCharacters(newCharacters);
+
+          // Extract chapters from legacy string
+          const uniqueChapters = new Set<string>();
+          newScenes.forEach(s => {
+             if (s.chapter) uniqueChapters.add(s.chapter.trim());
+          });
+          const newChapters: Chapter[] = Array.from(uniqueChapters).filter(Boolean).map(title => ({
+             id: crypto.randomUUID(),
+             title
+          }));
+          
+          // Map scenes to chapter IDs
+          setScenes(prev => prev.map(s => {
+            const found = newChapters.find(c => c.title === s.chapter?.trim());
+            return found ? { ...s, chapterId: found.id } : s;
+          }));
+          
+          setChapters(newChapters);
+
           alert('読み込みました (旧形式変換済み)');
         } else if (parsed.scenes && parsed.characters) {
           // New format
-          setScenes(parsed.scenes);
+          // Legacy migration for files that have scenes/chars but no explicit chapter objects yet (if any?)
+          // If loading a file saved before this update but after the last update (has scenes/chars/locs but no chapters)
+          let loadedScenes = parsed.scenes as Scene[];
+          let loadedChapters = parsed.chapters as Chapter[] || [];
+
+          if (loadedChapters.length === 0) {
+              // Migration from intermediate format (v0.5.1) to v0.6.0 (with chapters)
+              const uniqueChapters = new Set<string>();
+              loadedScenes.forEach(s => {
+                if (s.chapter) uniqueChapters.add(s.chapter.trim());
+              });
+              loadedChapters = Array.from(uniqueChapters).filter(Boolean).map(title => ({
+                id: crypto.randomUUID(),
+                title
+              }));
+              
+              // Apply IDs to scenes
+              loadedScenes = loadedScenes.map(s => {
+                const found = loadedChapters.find(c => c.title === s.chapter?.trim());
+                return found ? { ...s, chapterId: found.id } : s;
+              });
+          }
+
+          setScenes(loadedScenes);
           setCharacters(parsed.characters);
+          setChapters(loadedChapters);
           if (parsed.locations) {
             setLocations(parsed.locations);
           }
@@ -494,6 +612,28 @@ function App() {
       alert('読み込みに失敗しました: ' + e);
     }
   };
+
+  // Initial Load & Version Check
+  useEffect(() => {
+    getVersion().then(v => setAppVersion(v)).catch(() => setAppVersion('Unknown'));
+  }, []);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+S or Command+S
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault(); // Prevent browser default save
+        handleOverwriteSave(false);
+      }
+    };
+
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleOverwriteSave]); // Re-bind when save handler changes (which depends on state)
 
   const handleDeploy = async () => {
     setIsFileMenuOpen(false);
@@ -521,9 +661,13 @@ function App() {
         const scene = scenes[i];
         
         // Check if chapter changed
-        if (scene.chapter !== lastChapterTitle || i === 0) {
+        const currentChapterTitle = scene.chapterId 
+            ? chapters?.find(c => c.id === scene.chapterId)?.title 
+            : scene.chapter;
+            
+        if (currentChapterTitle !== lastChapterTitle || i === 0) {
           chapterCount++;
-          lastChapterTitle = scene.chapter;
+          lastChapterTitle = currentChapterTitle || '';
         }
 
         // Create Chapter Folder Name: XX_ChapterName
@@ -531,7 +675,7 @@ function App() {
         // Sanitize folder name slightly to avoid illegal chars if possible, 
         // though user might want exact match. Just a precaution for invalid chars could be complex,
         // trusting user input for now or minimal replacement.
-        const safeChapterTitle = scene.chapter.trim() || '無題の章';
+        const safeChapterTitle = (lastChapterTitle || '無題の章').trim();
         const folderName = `${numStr}_${safeChapterTitle}`;
         const folderPath = `${baseDir}${sep}${folderName}`;
 
@@ -597,8 +741,11 @@ function App() {
           </button>
           {isFileMenuOpen && (
             <div className="dropdown-menu">
-              <button className="dropdown-item" onClick={handleSaveFile}>
-                保存...
+              <button className="dropdown-item" onClick={() => handleOverwriteSave(false)}>
+                上書き保存
+              </button>
+              <button className="dropdown-item" onClick={handleSaveAs}>
+                名前を付けて保存...
               </button>
               <button className="dropdown-item" onClick={handleLoadFile}>
                 開く...
@@ -610,6 +757,10 @@ function App() {
               <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
               <button className="dropdown-item" onClick={() => { setIsFileMenuOpen(false); setIsSettingsOpen(true); }}>
                 設定...
+              </button>
+              <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
+              <button className="dropdown-item" onClick={() => { setIsFileMenuOpen(false); setIsAboutOpen(true); }}>
+                バージョン情報...
               </button>
             </div>
           )}
@@ -630,6 +781,13 @@ function App() {
             style={{ marginRight: '0.5rem' }}
           >
             登場人物設定
+          </button>
+          <button 
+            className="secondary" 
+            onClick={() => setIsChapterMenuOpen(true)}
+            style={{ marginRight: '0.5rem' }}
+          >
+            章設定
           </button>
           {settings.placeInputMode === 'select' && (
             <button 
@@ -663,6 +821,7 @@ function App() {
                   key={scene.id} 
                   scene={scene} 
                   characterList={characters}
+                  chapterList={chapters}
                   onClick={startEditing}
                 />
               ))}
@@ -670,7 +829,7 @@ function App() {
           </SortableContext>
           
           <DragOverlay>
-            {activeScene ? <SceneCardOverlay scene={activeScene} characterList={characters} /> : null}
+            {activeScene ? <SceneCardOverlay scene={activeScene} characterList={characters} chapterList={chapters} /> : null}
           </DragOverlay>
         </DndContext>
       </main>
@@ -689,11 +848,27 @@ function App() {
                 {/* シーンNO入力削除、時間入力を単独行にしないためレイアウト調整 */}
                 <div className="form-group">
                   <label>章タイトル</label>
-                  <input 
-                    value={editForm.chapter} 
-                    onChange={e => handleInputChange('chapter', e.target.value)} 
-                    placeholder="第1章..."
-                  />
+                  <select
+                    value={editForm.chapterId || ''}
+                    onChange={e => {
+                        const newId = e.target.value;
+                        const newTitle = chapters.find(c => c.id === newId)?.title || '';
+                        setEditForm({ ...editForm, chapterId: newId, chapter: newTitle });
+                    }}
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.5rem',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-main)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-sm)'
+                    }}
+                  >
+                    <option value="">-- 選択してください --</option>
+                    {chapters.map(c => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>時間</label>
@@ -1057,6 +1232,45 @@ function App() {
       )}
 
       {/* Settings Modal */}
+      {isChapterMenuOpen && (
+        <div className="modal-overlay" onClick={() => setIsChapterMenuOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>章設定</h2>
+              <button className="close-btn" onClick={() => setIsChapterMenuOpen(false)}>✕</button>
+            </div>
+            <div className="edit-form">
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                {chapters.map(chap => (
+                  <li key={chap.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    <input 
+                      value={chap.title}
+                      onChange={(e) => updateChapter(chap.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ flex: 1 }}
+                    />
+                    <button type="button" className="delete-btn" onClick={() => deleteChapter(chap.id)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>削除</button>
+                  </li>
+                ))}
+              </ul>
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input 
+                  type="text"
+                  value={newChapterTitle}
+                  onChange={(e) => setNewChapterTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addChapter(); }}
+                  placeholder="新しい章のタイトル"
+                  style={{ flex: 1 }}
+                />
+                <button type="button" onClick={() => addChapter()}>追加</button>
+                <button type="button" className="primary" onClick={() => setIsChapterMenuOpen(false)}>閉じる</button>
+              </div>
+           </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
           <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
@@ -1108,6 +1322,16 @@ function App() {
                   リスト選択モードでは、「場所設定」で登録した場所から選択できます。
                 </small>
               </div>
+              <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
+                 <input 
+                   type="checkbox" 
+                   id="autoSave"
+                   checked={settings.autoSave} 
+                   onChange={(e) => setSettings({ ...settings, autoSave: e.target.checked })}
+                   style={{ width: 'auto' }}
+                 />
+                 <label htmlFor="autoSave" style={{ marginBottom: 0, cursor: 'pointer' }}>自動保存を有効にする（入力中断後2秒後）</label>
+              </div>
               <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="button" className="primary" onClick={() => setIsSettingsOpen(false)}>閉じる</button>
               </div>
@@ -1115,6 +1339,34 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* About Modal */}
+      {isAboutOpen && (
+        <div className="modal-overlay" onClick={() => setIsAboutOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ justifyContent: 'center', borderBottom: 'none', paddingBottom: 0 }}>
+              {/* Logo placeholder or Icon could go here */}
+            </div>
+            <div style={{ padding: '2rem 1rem' }}>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>箱書きエディタ</h2>
+              <p style={{ color: 'var(--text-sub)', marginBottom: '1.5rem' }}>Version {appVersion}</p>
+              
+              <p style={{ fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+                シンプルで使いやすい<br/>
+                小説・脚本構成作成ツール
+              </p>
+              
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-sub)' }}>
+                &copy; 2025 Gennosuke Satsuki
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="primary" onClick={() => setIsAboutOpen(false)} style={{ minWidth: '120px' }}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
