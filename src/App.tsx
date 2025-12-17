@@ -70,6 +70,7 @@ interface StoryData {
   locations?: Location[];
   chapters?: Chapter[];
   settings?: AppSettings;
+  lastDeployPath?: string; // Last directory path used for deployment
 }
 
 const INITIAL_SCENE: Scene = {
@@ -226,6 +227,7 @@ function App() {
     { id: '1', title: '第1章' },
   ]);
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+  const [lastDeployPath, setLastDeployPath] = useState<string | null>(null); // For future use
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Scene | null>(null);
@@ -458,7 +460,7 @@ function App() {
       });
       
       if (path) {
-        const data: StoryData = { scenes, characters, locations, chapters, settings };
+        const data: StoryData = { scenes, characters, locations, chapters, settings, lastDeployPath: lastDeployPath ?? undefined };
         await writeTextFile(path, JSON.stringify(data, null, 2));
         setCurrentFilePath(path);
         alert('保存しました');
@@ -477,7 +479,7 @@ function App() {
     }
 
     try {
-      const data: StoryData = { scenes, characters, locations, chapters, settings };
+      const data: StoryData = { scenes, characters, locations, chapters, settings, lastDeployPath: lastDeployPath ?? undefined };
       await writeTextFile(currentFilePath, JSON.stringify(data, null, 2));
       if (!silent) alert('上書き保存しました');
       else console.log('Auto saved');
@@ -602,6 +604,9 @@ function App() {
           if (parsed.settings) {
             setSettings(parsed.settings);
           }
+          if (parsed.lastDeployPath) {
+            setLastDeployPath(parsed.lastDeployPath);
+          }
           alert('読み込みました');
         } else {
           alert('ファイル形式が正しくありません');
@@ -645,6 +650,9 @@ function App() {
       });
 
       if (!baseDir) return;
+
+      // Remember the deploy path for future use
+      setLastDeployPath(baseDir);
 
       // Simple separator detection (not perfect but works for most cases provided by dialog)
       const isWindows = typeof baseDir === 'string' && baseDir.includes('\\');
@@ -691,7 +699,8 @@ function App() {
         const fileName = `${sceneNum}_${safeTitle}.txt`;
         const filePath = `${folderPath}${sep}${fileName}`;
         
-        // Create box-writing metadata content
+        // Create box-writing metadata content with separator note
+        const separator = '──────────────(本文執筆完了後に消してください)──────────────';
         const boxContent = `**場所** ${scene.place}
 **時間** ${formatTimeForDisplay(scene.time, scene.timeMode)}
 
@@ -703,35 +712,68 @@ function App() {
 
 **裏設定** ${scene.note}
 
-────────────────────────────────
+${separator}
 
 `;
 
+        let shouldWrite = true;
         let finalContent = boxContent;
 
-        // If file already exists, read existing content and append it
+        // If file already exists, read existing content and compare
         if (await exists(filePath)) {
-          console.log(`Updating existing file: ${fileName}`);
+          console.log(`File exists: ${fileName}`);
           try {
             const existingContent = await readTextFile(filePath);
             
-            // Remove old box-writing section if it exists (content before separator line)
-            const separatorIndex = existingContent.indexOf('────────────────────────────────');
+            // Find separator line (check for both old and new format)
+            const oldSeparator = '────────────────────────────────';
+            const newSeparatorPattern = /──────────────\(本文執筆完了後に消してください\)──────────────/;
+            
+            let separatorIndex = existingContent.search(newSeparatorPattern);
+            let foundSeparator = separator;
+            
+            if (separatorIndex === -1) {
+              // Try old separator format
+              separatorIndex = existingContent.indexOf(oldSeparator);
+              if (separatorIndex !== -1) {
+                foundSeparator = oldSeparator;
+              }
+            }
+            
             if (separatorIndex !== -1) {
-              // Keep only the content after the separator
-              const bodyContent = existingContent.substring(separatorIndex).replace(/^────────────────────────────────\s*\n+/, '');
-              finalContent = boxContent + bodyContent;
+              // Separator found - file is still in draft mode
+              // Extract existing box-writing section (before separator)
+              const existingBoxContent = existingContent.substring(0, separatorIndex + foundSeparator.length + 1);
+              
+              // Extract body content (after separator)
+              const bodyContent = existingContent.substring(separatorIndex).replace(new RegExp(`^${foundSeparator.replace(/[()]/g, '\\$&')}\\s*\\n+`), '');
+              
+              // Compare box-writing sections (normalize separator for comparison)
+              const normalizedExisting = existingBoxContent.replace(oldSeparator, separator).trim();
+              const normalizedNew = boxContent.trim();
+              
+              if (normalizedExisting === normalizedNew) {
+                console.log(`Box content unchanged, skipping: ${fileName}`);
+                shouldWrite = false;
+              } else {
+                console.log(`Box content changed, updating: ${fileName}`);
+                finalContent = boxContent + bodyContent;
+              }
             } else {
-              // No separator found, append entire existing content
-              finalContent = boxContent + existingContent;
+              // No separator found - writing is complete, skip updating
+              console.log(`No separator found (writing complete), skipping: ${fileName}`);
+              shouldWrite = false;
             }
           } catch (e) {
             console.error(`Error reading existing file: ${fileName}`, e);
-            // If read fails, just use box content
+            // If read fails, write new content
           }
         }
 
-        await writeTextFile(filePath, finalContent);
+        // Only write if needed
+        if (shouldWrite) {
+          await writeTextFile(filePath, finalContent);
+        }
       }
 
       alert('書き出しが完了しました');
