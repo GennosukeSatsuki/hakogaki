@@ -133,8 +133,7 @@ function SortableSceneCard({ scene, chapterList, onClick, isHiddenFull }: Sortab
       </div>
       
       <div className="card-row">
-        <span className="label">章</span>
-        <span className="value strong">
+        <span className="value strong" style={{ fontSize: '0.95em' }}>
           {scene.chapterId ? chapterList.find(c => c.id === scene.chapterId)?.title : (scene.chapter || '-')}
         </span>
       </div>
@@ -156,8 +155,7 @@ function SceneCardOverlay({ scene, chapterList }: { scene: Scene, chapterList: C
         <span className="scene-title">{scene.title || '(無題)'}</span>
       </div>
       <div className="card-row">
-        <span className="label">章</span>
-        <span className="value strong">
+        <span className="value strong" style={{ fontSize: '0.95em' }}>
           {scene.chapterId ? chapterList.find(c => c.id === scene.chapterId)?.title : (scene.chapter || '-')}
         </span>
       </div>
