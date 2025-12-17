@@ -50,7 +50,7 @@ xattr -cr /Applications/箱書きエディタ.app
 
 **Linux版**:
 
-面倒くさかった……。自分でビルドして使ってください・
+Github Actionsで解決済✨️
 
 - **そのままで動かすなら**:
 - Node.js (v16+)
