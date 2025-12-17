@@ -93,3 +93,29 @@ npm run tauri build
 ## ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。詳細はLICENSEファイルをご覧ください。
+
+### 使用している外部ライブラリ
+
+このアプリケーションは以下のオープンソースライブラリを使用しています：
+
+#### MIT License
+
+- **React** (Copyright (c) Meta Platforms, Inc. and affiliates)
+  - https://github.com/facebook/react
+- **dnd-kit** (Copyright (c) 2021, Claudéric Demers)
+  - @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities
+  - https://github.com/clauderic/dnd-kit
+
+#### MIT OR Apache-2.0 License
+
+- **Tauri** (Copyright (c) 2017 - Present Tauri Programme within The Commons Conservancy)
+  - @tauri-apps/api, @tauri-apps/plugin-dialog, @tauri-apps/plugin-fs, @tauri-apps/plugin-opener
+  - https://github.com/tauri-apps/tauri
+
+#### 0BSD License
+
+- **tslib** (Copyright (c) Microsoft Corporation)
+  - https://github.com/Microsoft/tslib
+
+各ライブラリの詳細なライセンス条文は、それぞれのリポジトリまたは`node_modules`内のLICENSEファイルをご参照ください。
+
