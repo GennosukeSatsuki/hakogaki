@@ -624,7 +624,7 @@ function App() {
       // Check for Ctrl+S or Command+S
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault(); // Prevent browser default save
-        handleOverwriteSave(false);
+        handleOverwriteSave(true); // Silent save for keyboard shortcut
       }
     };
 
@@ -691,14 +691,8 @@ function App() {
         const fileName = `${sceneNum}_${safeTitle}.txt`;
         const filePath = `${folderPath}${sep}${fileName}`;
         
-        // Skip if file already exists
-        if (await exists(filePath)) {
-          console.log(`Skipping existing file: ${fileName}`);
-          continue;
-        }
-
-        // Create Content
-        const content = `**場所** ${scene.place}
+        // Create box-writing metadata content
+        const boxContent = `**場所** ${scene.place}
 **時間** ${formatTimeForDisplay(scene.time, scene.timeMode)}
 
 **登場人物** ${scene.characterIds?.map(id => characters.find(c => c.id === id)?.name).filter(Boolean).join(', ') || scene.characters}
@@ -708,9 +702,36 @@ function App() {
 **詳細なあらすじ** ${scene.summary}
 
 **裏設定** ${scene.note}
+
+────────────────────────────────
+
 `;
 
-        await writeTextFile(filePath, content);
+        let finalContent = boxContent;
+
+        // If file already exists, read existing content and append it
+        if (await exists(filePath)) {
+          console.log(`Updating existing file: ${fileName}`);
+          try {
+            const existingContent = await readTextFile(filePath);
+            
+            // Remove old box-writing section if it exists (content before separator line)
+            const separatorIndex = existingContent.indexOf('────────────────────────────────');
+            if (separatorIndex !== -1) {
+              // Keep only the content after the separator
+              const bodyContent = existingContent.substring(separatorIndex).replace(/^────────────────────────────────\s*\n+/, '');
+              finalContent = boxContent + bodyContent;
+            } else {
+              // No separator found, append entire existing content
+              finalContent = boxContent + existingContent;
+            }
+          } catch (e) {
+            console.error(`Error reading existing file: ${fileName}`, e);
+            // If read fails, just use box content
+          }
+        }
+
+        await writeTextFile(filePath, finalContent);
       }
 
       alert('書き出しが完了しました');
