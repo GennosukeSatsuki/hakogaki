@@ -1,8 +1,8 @@
 [package]
 name = "tauri-app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.9.0"
+description = "箱書きエディタ - A scene planning editor for novelists"
+authors = ["GennosukeSatsuki"]
 license = "MIT"
 edition = "2021"
 
