@@ -140,19 +140,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      post-to-x:
+    needs: update-release-notes
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Post to X (Twitter)
-        # API v2 に対応したアクションに変更
         uses: ethomson/send-tweet-action@v1
         with:
+          # ここを env ではなく with の中に記述します
+          consumer-key: ${{ secrets.TWITTER_CONSUMER_API_KEY }}
+          consumer-secret: ${{ secrets.TWITTER_CONSUMER_API_SECRET }}
+          access-token: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          access-token-secret: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
           status: |
             📦 箱書きエディタ ${{ github.ref_name }} をリリースしました！
 
             ダウンロード: https://github.com/GennosukeSatsuki/hakogaki/releases/tag/${{ github.ref_name }}
 
             #箱書きエディタ #小説執筆 #創作支援
-        env:
-          # 変数名は同じでOKですが、念のため確認してください
-          TWITTER_CONSUMER_API_KEY: ${{ secrets.TWITTER_CONSUMER_API_KEY }}
-          TWITTER_CONSUMER_API_SECRET: ${{ secrets.TWITTER_CONSUMER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
