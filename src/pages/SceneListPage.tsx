@@ -71,6 +71,8 @@ interface AppSettings {
   placeInputMode: 'text' | 'select';
   autoSave: boolean;
   theme: 'system' | 'light' | 'dark';
+  editorFontFamily?: string;
+  editorFontSize?: number;
 }
 
 // Data structure for saving/loading
@@ -233,8 +235,9 @@ export default function SceneListPage() {
   const [newCharacterName, setNewCharacterName] = useState(''); // For adding new character
   const [newLocationName, setNewLocationName] = useState(''); // For adding new location
   const [newChapterTitle, setNewChapterTitle] = useState(''); // For adding new chapter
-  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text', placeInputMode: 'text', autoSave: false, theme: 'system' });
+  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text', placeInputMode: 'text', autoSave: false, theme: 'system', editorFontFamily: 'sans-serif', editorFontSize: 16 });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'outline' | 'editor'>('general');
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1593,90 +1596,191 @@ ${separator}
       {/* Settings Modal */}
       {isSettingsOpen && (
         <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
-          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+          <div className="modal-content" style={{ maxWidth: '500px', padding: '0' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '1.5rem 1.5rem 1rem' }}>
               <h2>設定</h2>
               <button className="close-btn" onClick={() => setIsSettingsOpen(false)}>✕</button>
             </div>
-            <div className="edit-form">
-              <div className="form-group">
-                <label>時間入力モード</label>
-                <select 
-                  value={settings.timeInputMode}
-                  onChange={(e) => setSettings({ ...settings, timeInputMode: e.target.value as 'text' | 'datetime' })}
-                  style={{ 
-                    backgroundColor: 'var(--bg-input)', 
-                    color: 'var(--text-main)', 
-                    border: '1px solid var(--border-subtle)',
-                    padding: '0.5rem',
-                    borderRadius: 'var(--radius-sm)',
-                    width: '100%'
-                  }}
-                >
-                  <option value="text">テキスト入力（例：昼、夕方）</option>
-                  <option value="datetime">日時選択（カレンダー＋時計）</option>
-                </select>
-                <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
-                  日時選択モードでは、カレンダーと時計で正確な日時を設定できます。
-                  書き出し時は読みやすい形式に変換されます。
-                </small>
-              </div>
-              <div className="form-group">
-                <label>場所入力モード</label>
-                <select 
-                  value={settings.placeInputMode}
-                  onChange={(e) => setSettings({ ...settings, placeInputMode: e.target.value as 'text' | 'select' })}
-                  style={{ 
-                    backgroundColor: 'var(--bg-input)', 
-                    color: 'var(--text-main)', 
-                    border: '1px solid var(--border-subtle)',
-                    padding: '0.5rem',
-                    borderRadius: 'var(--radius-sm)',
-                    width: '100%'
-                  }}
-                >
-                  <option value="text">テキスト入力（自由入力）</option>
-                  <option value="select">リストから選択</option>
-                </select>
-                <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
-                  リスト選択モードでは、「場所設定」で登録した場所から選択できます。
-                </small>
-              </div>
-              <div className="form-group">
-                <label>テーマ</label>
-                <select 
-                  value={settings.theme}
-                  onChange={(e) => setSettings({ ...settings, theme: e.target.value as 'system' | 'light' | 'dark' })}
-                  style={{ 
-                    backgroundColor: 'var(--bg-input)', 
-                    color: 'var(--text-main)', 
-                    border: '1px solid var(--border-subtle)',
-                    padding: '0.5rem',
-                    borderRadius: 'var(--radius-sm)',
-                    width: '100%'
-                  }}
-                >
-                  <option value="system">システムデフォルト</option>
-                  <option value="light">ライトモード</option>
-                  <option value="dark">ダークモード</option>
-                </select>
-                <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
-                  システムデフォルトでは、OSの設定に従ってテーマが自動的に切り替わります。
-                </small>
-              </div>
-              <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
-                 <input 
-                   type="checkbox" 
-                   id="autoSave"
-                   checked={settings.autoSave} 
-                   onChange={(e) => setSettings({ ...settings, autoSave: e.target.checked })}
-                   style={{ width: 'auto' }}
-                 />
-                 <label htmlFor="autoSave" style={{ marginBottom: 0, cursor: 'pointer' }}>自動保存を有効にする（入力中断後2秒後）</label>
-              </div>
-              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="button" className="primary" onClick={() => setIsSettingsOpen(false)}>閉じる</button>
-              </div>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 1.5rem' }}>
+              <button
+                style={{
+                  padding: '0.75rem 1rem',
+                  border: 'none',
+                  borderBottom: activeSettingsTab === 'general' ? '2px solid var(--primary)' : '2px solid transparent',
+                  background: 'none',
+                  color: activeSettingsTab === 'general' ? 'var(--primary)' : 'var(--text-secondary)',
+                  fontWeight: activeSettingsTab === 'general' ? 'bold' : 'normal',
+                  cursor: 'pointer',
+                  marginRight: '1rem'
+                }}
+                onClick={() => setActiveSettingsTab('general')}
+              >
+                基本設定
+              </button>
+              <button
+                style={{
+                  padding: '0.75rem 1rem',
+                  border: 'none',
+                  borderBottom: activeSettingsTab === 'outline' ? '2px solid var(--primary)' : '2px solid transparent',
+                  background: 'none',
+                  color: activeSettingsTab === 'outline' ? 'var(--primary)' : 'var(--text-secondary)',
+                  fontWeight: activeSettingsTab === 'outline' ? 'bold' : 'normal',
+                  cursor: 'pointer',
+                  marginRight: '1rem'
+                }}
+                onClick={() => setActiveSettingsTab('outline')}
+              >
+                箱書き
+              </button>
+              <button
+                style={{
+                  padding: '0.75rem 1rem',
+                  border: 'none',
+                  borderBottom: activeSettingsTab === 'editor' ? '2px solid var(--primary)' : '2px solid transparent',
+                  background: 'none',
+                  color: activeSettingsTab === 'editor' ? 'var(--primary)' : 'var(--text-secondary)',
+                  fontWeight: activeSettingsTab === 'editor' ? 'bold' : 'normal',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setActiveSettingsTab('editor')}
+              >
+                エディター
+              </button>
+            </div>
+
+            <div className="edit-form" style={{ padding: '1.5rem' }}>
+              {activeSettingsTab === 'general' && (
+                <>
+                  <div className="form-group">
+                    <label>テーマ</label>
+                    <select 
+                      value={settings.theme}
+                      onChange={(e) => setSettings({ ...settings, theme: e.target.value as 'system' | 'light' | 'dark' })}
+                      style={{ 
+                        backgroundColor: 'var(--bg-input)', 
+                        color: 'var(--text-main)', 
+                        border: '1px solid var(--border-subtle)',
+                        padding: '0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        width: '100%'
+                      }}
+                    >
+                      <option value="system">システムに従う</option>
+                      <option value="light">ライトモード</option>
+                      <option value="dark">ダークモード</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <label style={{ margin: 0 }}>自動保存</label>
+                      <label className="toggle-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={settings.autoSave}
+                          onChange={(e) => setSettings({ ...settings, autoSave: e.target.checked })}
+                        />
+                        <span className="slider round"></span>
+                      </label>
+                    </div>
+                    <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                      ファイルが開かれている場合、変更を自動的に上書き保存します（入力停止2秒後）。
+                    </small>
+                  </div>
+                </>
+              )}
+
+              {activeSettingsTab === 'outline' && (
+                <>
+                  <div className="form-group">
+                    <label>時間入力モード</label>
+                    <select 
+                      value={settings.timeInputMode}
+                      onChange={(e) => setSettings({ ...settings, timeInputMode: e.target.value as 'text' | 'datetime' })}
+                      style={{ 
+                        backgroundColor: 'var(--bg-input)', 
+                        color: 'var(--text-main)', 
+                        border: '1px solid var(--border-subtle)',
+                        padding: '0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        width: '100%'
+                      }}
+                    >
+                      <option value="text">テキスト入力（例：昼、夕方）</option>
+                      <option value="datetime">日時選択（カレンダー＋時計）</option>
+                    </select>
+                    <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                      日時選択モードでは、カレンダーと時計で正確な日時を設定できます。
+                      書き出し時は読みやすい形式に変換されます。
+                    </small>
+                  </div>
+                  <div className="form-group">
+                    <label>場所入力モード</label>
+                    <select 
+                      value={settings.placeInputMode}
+                      onChange={(e) => setSettings({ ...settings, placeInputMode: e.target.value as 'text' | 'select' })}
+                      style={{ 
+                        backgroundColor: 'var(--bg-input)', 
+                        color: 'var(--text-main)', 
+                        border: '1px solid var(--border-subtle)',
+                        padding: '0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        width: '100%'
+                      }}
+                    >
+                      <option value="text">テキスト入力（自由入力）</option>
+                      <option value="select">リストから選択</option>
+                    </select>
+                    <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                      リスト選択モードでは、「場所設定」で登録した場所から選択できます。
+                    </small>
+                  </div>
+                </>
+              )}
+
+              {activeSettingsTab === 'editor' && (
+                <>
+                  <div className="form-group">
+                    <label>フォント</label>
+                    <select 
+                      value={settings.editorFontFamily || 'sans-serif'}
+                      onChange={(e) => setSettings({ ...settings, editorFontFamily: e.target.value })}
+                      style={{ 
+                        backgroundColor: 'var(--bg-input)', 
+                        color: 'var(--text-main)', 
+                        border: '1px solid var(--border-subtle)',
+                        padding: '0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        width: '100%'
+                      }}
+                    >
+                      <option value="sans-serif">ゴシック体 (標準)</option>
+                      <option value="serif">明朝体</option>
+                      <option value="monospace">等幅フォント</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>フォントサイズ (px)</label>
+                    <input 
+                      type="number" 
+                      min="10" 
+                      max="72"
+                      value={settings.editorFontSize || 16}
+                      onChange={(e) => setSettings({ ...settings, editorFontSize: parseInt(e.target.value) || 16 })}
+                      style={{ 
+                        backgroundColor: 'var(--bg-input)', 
+                        color: 'var(--text-main)', 
+                        border: '1px solid var(--border-subtle)',
+                        padding: '0.5rem',
+                        borderRadius: 'var(--radius-sm)',
+                        width: '100%'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
+              <button className="primary-btn" onClick={() => setIsSettingsOpen(false)}>閉じる</button>
             </div>
           </div>
         </div>
