@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 全履歴を取得（リリースノート生成に必要）
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -57,13 +59,70 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: '箱書きエディタ ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseBody: 'ビルド中です。完了後、リリースノートが自動生成されます。'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
-  post-to-x:
+  update-release-notes:
     needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Notes
+        id: generate_notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: context.ref.replace('refs/tags/', '')
+            });
+
+            const { data: notes } = await github.rest.repos.generateReleaseNotes({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: context.ref.replace('refs/tags/', ''),
+              previous_tag_name: undefined
+            });
+
+            // リリースノートを更新
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body: `# 箱書きエディタ ${context.ref.replace('refs/tags/', '')}
+
+## 📦 ダウンロード
+
+各プラットフォーム用のインストーラーは下記の Assets からダウンロードできます。
+
+### macOS
+- \`箱書きエディタ_${context.ref.replace('refs/tags/', '').replace('v', '')}_universal.dmg\`
+
+### Windows
+- \`箱書きエディタ_${context.ref.replace('refs/tags/', '').replace('v', '')}_x64-setup.exe\`
+- \`箱書きエディタ_${context.ref.replace('refs/tags/', '').replace('v', '')}_x64_en-US.msi\`
+
+### Linux
+- \`箱書きエディタ_${context.ref.replace('refs/tags/', '').replace('v', '')}_amd64.deb\`
+- \`箱書きエディタ_${context.ref.replace('refs/tags/', '').replace('v', '')}_amd64.AppImage\`
+
+---
+
+${notes.body}
+`
+            });
+
+  post-to-x:
+    needs: update-release-notes
     runs-on: ubuntu-latest
     if: success()
     steps:
