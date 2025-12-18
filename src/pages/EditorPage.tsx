@@ -106,25 +106,23 @@ export default function EditorPage() {
         setOriginalContent(fileContent); // 元の内容を保存
 
         // 進捗管理（今日の開始文字数を取得・設定）
-        const today = new Date().toDateString(); // YYYY-MM-DD形式でローカル依存だが、日毎の識別に十分
-        const progressKey = `dailyProgress_${id}`;
-        const savedProgress = localStorage.getItem(progressKey);
-        
+        const today = new Date().toDateString();
         const currentBodyCount = getBodyCharCount(fileContent);
         
         // 文字数をキャッシュ（総文字数計算用）
         localStorage.setItem(`sceneCharCount_${id}`, currentBodyCount.toString());
 
-        if (savedProgress) {
-          const { date } = JSON.parse(savedProgress);
-          if (date !== today) {
-            // 日付が変わっていれば現在の文字数を開始文字数としてリセット
-            localStorage.setItem(progressKey, JSON.stringify({ date: today, count: currentBodyCount }));
-          }
-        } else {
-          // データがない場合は現在の文字数を開始文字数として保存
-          localStorage.setItem(progressKey, JSON.stringify({ date: today, count: currentBodyCount }));
+        // プロジェクトデータ内の進捗情報を更新
+        if (!data.dailyProgress || data.dailyProgress.date !== today) {
+          data.dailyProgress = { date: today, startingCounts: {} };
         }
+        
+        if (data.dailyProgress.startingCounts[id!] === undefined) {
+          data.dailyProgress.startingCounts[id!] = currentBodyCount;
+        }
+        
+        // localStorageを更新（SceneListPageと共有するため）
+        localStorage.setItem('storyData', JSON.stringify(data));
       }
 
       setLoading(false);
@@ -257,31 +255,29 @@ export default function EditorPage() {
     if (!savedData) return 0;
     
     const data = JSON.parse(savedData);
+    if (!data.dailyProgress) return 0;
+    
     const today = new Date().toDateString();
+    if (data.dailyProgress.date !== today) return 0;
+    
+    const startingCounts = data.dailyProgress.startingCounts || {};
     let totalProgress = 0;
     
     data.scenes?.forEach((s: any) => {
-      const progressKey = `dailyProgress_${s.id}`;
-      const savedProgress = localStorage.getItem(progressKey);
-      
-      if (savedProgress) {
-        const { date, count } = JSON.parse(savedProgress);
-        if (date === today) {
-          // 今日のデータがある場合
-          const cacheKey = `sceneCharCount_${s.id}`;
-          const cached = localStorage.getItem(cacheKey);
-          
-          if (s.id === id) {
-            // 現在編集中のシーン（最新の値を使用）
-            totalProgress += getBodyCharCount(content) - count;
-          } else if (cached) {
-            // 他のシーン（キャッシュから計算）
-            totalProgress += parseInt(cached, 10) - count;
+      const startingCount = startingCounts[s.id];
+      if (startingCount !== undefined) {
+        if (s.id === id) {
+          // 現在編集中のシーンは最新の文字数を使用
+          totalProgress += getBodyCharCount(content) - startingCount;
+        } else {
+          // 他のシーンはキャッシュされた文字数を使用
+          const cached = localStorage.getItem(`sceneCharCount_${s.id}`);
+          if (cached) {
+            totalProgress += parseInt(cached, 10) - startingCount;
           }
         }
       }
     });
-    
     return totalProgress;
   };
 

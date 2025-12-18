@@ -11,12 +11,20 @@ interface TiptapEditorProps {
   placeholder?: string; // Kept in interface but unused for now
 }
 
+const textToHtml = (text: string) => {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .map(p => `<p>${p}</p>`)
+    .join('');
+};
+
 const TiptapEditor = ({ content, onChange, settings }: TiptapEditorProps) => {
   const editor = useEditor({
     extensions: [
       StarterKit,
     ],
-    content: content,
+    content: textToHtml(content),
     onUpdate: ({ editor }) => {
       onChange(editor.getText({ blockSeparator: '\n' }));
     },
@@ -47,6 +55,13 @@ const TiptapEditor = ({ content, onChange, settings }: TiptapEditorProps) => {
             const domSel = window.getSelection();
             if (domSel) {
                domSel.modify('move', 'forward', 'line');
+               // Sync PM selection to DOM selection and scroll
+               setTimeout(() => {
+                 const { state, dispatch } = view;
+                 // ProseMirror usually syncs automatically on the next tick, 
+                 // but we force a scroll here if needed.
+                 dispatch(state.tr.scrollIntoView());
+               }, 0);
                event.preventDefault();
                return true;
             }
@@ -54,6 +69,11 @@ const TiptapEditor = ({ content, onChange, settings }: TiptapEditorProps) => {
             const domSel = window.getSelection();
             if (domSel) {
                domSel.modify('move', 'backward', 'line');
+               // Sync PM selection to DOM selection and scroll
+               setTimeout(() => {
+                 const { state, dispatch } = view;
+                 dispatch(state.tr.scrollIntoView());
+               }, 0);
                event.preventDefault();
                return true;
             }
@@ -68,7 +88,7 @@ const TiptapEditor = ({ content, onChange, settings }: TiptapEditorProps) => {
   useEffect(() => {
     if (editor && content !== editor.getText({ blockSeparator: '\n' })) {
        if (!editor.isFocused) {
-          editor.commands.setContent(content);
+          editor.commands.setContent(textToHtml(content));
        }
     }
   }, [content, editor]);

@@ -23,7 +23,6 @@ import { save, open, ask } from '@tauri-apps/plugin-dialog';
 
 import { writeTextFile, readTextFile, mkdir, exists, rename, remove } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { documentDir } from '@tauri-apps/api/path';
 
 import '../App.css';
@@ -78,15 +77,22 @@ export interface AppSettings {
   verticalWriting?: boolean;
 }
 
+interface DailyProgress {
+  date: string;
+  startingCounts: Record<string, number>; // sceneId -> char count at start of day
+}
+
 // Data structure for saving/loading
-interface StoryData {
+export interface StoryData {
   scenes: Scene[];
   characters: Character[];
   locations?: Location[];
   chapters?: Chapter[];
   settings?: AppSettings;
-  lastDeployPath?: string; // Last directory path used for deployment
+  lastDeployPath?: string | null; // Last directory path used for deployment
   nextSceneNo?: number; // 次に割り当てるシーン番号
+  dailyProgress?: DailyProgress;
+  currentFilePath?: string | null;
 }
 
 const INITIAL_SCENE: Scene = {
@@ -246,6 +252,7 @@ export default function SceneListPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress | null>(null);
   
   // For long-press time picker
   const longPressTimer = useRef<number | null>(null);
@@ -503,7 +510,8 @@ export default function SceneListPage() {
         chapters, 
         settings, 
         lastDeployPath: lastDeployPath ?? undefined,
-        nextSceneNo 
+        nextSceneNo,
+        dailyProgress: dailyProgress ?? undefined
       };
       await writeTextFile(currentFilePath, JSON.stringify(data, null, 2));
       if (!silent) alert('上書き保存しました');
@@ -530,6 +538,15 @@ export default function SceneListPage() {
         if (data.settings) setSettings(data.settings);
         if (data.lastDeployPath) setLastDeployPath(data.lastDeployPath);
         if (data.nextSceneNo) setNextSceneNo(data.nextSceneNo);
+        if (data.dailyProgress) {
+          const today = new Date().toDateString();
+          if (data.dailyProgress.date === today) {
+            setDailyProgress(data.dailyProgress);
+          } else {
+            // 日付が変わっていれば破棄
+            setDailyProgress(null);
+          }
+        }
       } catch (e) {
         console.error('Failed to load from localStorage:', e);
       }
@@ -596,6 +613,7 @@ export default function SceneListPage() {
     setCurrentFilePath(null);
     setLastDeployPath(null);
     setNextSceneNo(2);
+    setDailyProgress(null);
     
     // localStorageもクリア
     localStorage.removeItem('storyData');
@@ -731,6 +749,18 @@ export default function SceneListPage() {
             const maxSceneNo = Math.max(...loadedScenes.map(s => s.sceneNo || 0), 0);
             setNextSceneNo(maxSceneNo + 1);
           }
+
+          // 進捗データの処理
+          if (parsed.dailyProgress) {
+            const today = new Date().toDateString();
+            if (parsed.dailyProgress.date === today) {
+              setDailyProgress(parsed.dailyProgress);
+            } else {
+              setDailyProgress(null);
+            }
+          } else {
+            setDailyProgress(null);
+          }
           
           alert('読み込みました');
         } else {
@@ -808,121 +838,23 @@ export default function SceneListPage() {
       console.log('Skipping save: scenes array is empty');
       return;
     }
-    
-    const storyData = {
+    const storyData: StoryData = {
       scenes,
       characters,
       locations,
       chapters,
       settings,
       lastDeployPath,
-      nextSceneNo
+      nextSceneNo,
+      dailyProgress: dailyProgress ?? undefined,
+      currentFilePath
     };
     console.log('Saving to localStorage:', storyData);
     localStorage.setItem('storyData', JSON.stringify(storyData));
-  }, [scenes, characters, locations, chapters, settings, lastDeployPath, nextSceneNo]); // initializedは依存配列に含めない
+  }, [scenes, characters, locations, chapters, settings, lastDeployPath, nextSceneNo, dailyProgress]);
 
-  // Handle window close event
-  useEffect(() => {
-    const appWindow = getCurrentWindow();
-    let unlistenFn: (() => void) | null = null;
-    
-    appWindow.onCloseRequested(async (event) => {
-      // Prevent the window from closing immediately
-      event.preventDefault();
-      
-      // Ask user if they want to save before closing
-      const shouldSave = await ask('アプリを終了する前に保存しますか？', {
-        title: '終了確認',
-        kind: 'info',
-        okLabel: '保存して終了',
-        cancelLabel: '保存せずに終了'
-      });
-      
-      if (shouldSave) {
-        try {
-          // Save JSON file if path exists
-          if (currentFilePath) {
-            const data: StoryData = { 
-              scenes, 
-              characters, 
-              locations, 
-              chapters, 
-              settings, 
-              lastDeployPath: lastDeployPath ?? undefined,
-              nextSceneNo 
-            };
-            await writeTextFile(currentFilePath, JSON.stringify(data, null, 2));
-            console.log('JSON保存完了');
-          }
-          
-          // Deploy if there's a last deploy path
-          if (lastDeployPath) {
-            console.log('書き出し開始:', lastDeployPath);
-            const isWindows = typeof lastDeployPath === 'string' && lastDeployPath.includes('\\\\');
-            const sep = isWindows ? '\\\\' : '/';
-            
-            for (let i = 0; i < scenes.length; i++) {
-              const scene = scenes[i];
-              const currentChapterId = scene.chapterId || '';
-              const currentChapter = chapters?.find(c => c.id === currentChapterId);
-              const currentChapterTitle = currentChapter?.title || scene.chapter || '無題の章';
-              
-              const chapterDeploymentNumber = currentChapter?.deploymentNumber || 1;
-              const numStr = chapterDeploymentNumber.toString().padStart(2, '0');
-              const safeChapterTitle = currentChapterTitle.trim();
-              const folderName = `${numStr}_${safeChapterTitle}`;
-              const folderPath = `${lastDeployPath}${sep}${folderName}`;
-              
-              await mkdir(folderPath, { recursive: true });
-              
-              const fileNum = (i + 1).toString().padStart(3, '0');
-              const safeTitle = scene.title.trim() || '無題のシーン';
-              const fileName = `${fileNum}_${safeTitle}.txt`;
-              const filePath = `${folderPath}${sep}${fileName}`;
-              
-              const content = `タイトル: ${scene.title}
-章: ${currentChapterTitle}
-登場人物: ${scene.characters}
-時間: ${formatTimeForDisplay(scene.time, scene.timeMode)}
-場所: ${scene.place}
-狙いと役割: ${scene.aim}
 
-【あらすじ】
-${scene.summary}
 
-【裏設定・メモ】
-${scene.note}`;
-              
-              await writeTextFile(filePath, content);
-            }
-            console.log('書き出し完了');
-          }
-        } catch (e) {
-          console.error('保存に失敗しました:', e);
-          // エラーが発生しても終了は続行
-        }
-      }
-      
-      // Remove the event listener before closing to prevent infinite loop
-      console.log('イベントリスナーを解除します');
-      if (unlistenFn) {
-        unlistenFn();
-      }
-      
-      // Close the window
-      console.log('ウィンドウを閉じます');
-      await appWindow.close();
-    }).then(fn => {
-      unlistenFn = fn;
-    });
-    
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, [scenes, characters, locations, chapters, settings, lastDeployPath, nextSceneNo, currentFilePath]);
 
   const handleDeploy = async () => {
     setIsFileMenuOpen(false);
@@ -1967,7 +1899,7 @@ ${separator}
                         onChange={(e) => setSettings({ ...settings, verticalWriting: e.target.checked })}
                         style={{ width: 'auto', cursor: 'pointer' }}
                       />
-                      <span>縦書きモード</span>
+                      <span>縦書きモード（実験中）</span>
                     </label>
                     <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
                       日本語小説向けの縦書き表示に切り替えます。行頭禁則処理が適用されます。

@@ -569,4 +569,11 @@ button.secondary:hover {
 
 .ProseMirror p {
   margin: 0;
+  margin-bottom: 1em;
+  /* Prevent margin from collapsing at the start of vertical lines */
+  display: block;
+}
+
+.ProseMirror p:last-child {
+  margin-bottom: 0;
 }
