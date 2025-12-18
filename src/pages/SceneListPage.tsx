@@ -68,13 +68,14 @@ interface Chapter {
   deploymentNumber?: number; // 書き出し時の章番号（初回書き出し時に割り当て）
 }
 
-interface AppSettings {
+export interface AppSettings {
   timeInputMode: 'text' | 'datetime';
   placeInputMode: 'text' | 'select';
   autoSave: boolean;
   theme: 'system' | 'light' | 'dark';
   editorFontFamily?: string;
   editorFontSize?: number;
+  verticalWriting?: boolean;
 }
 
 // Data structure for saving/loading
@@ -237,13 +238,14 @@ export default function SceneListPage() {
   const [newCharacterName, setNewCharacterName] = useState(''); // For adding new character
   const [newLocationName, setNewLocationName] = useState(''); // For adding new location
   const [newChapterTitle, setNewChapterTitle] = useState(''); // For adding new chapter
-  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text', placeInputMode: 'text', autoSave: false, theme: 'system', editorFontFamily: 'sans-serif', editorFontSize: 16 });
+  const [settings, setSettings] = useState<AppSettings>({ timeInputMode: 'text', placeInputMode: 'text', autoSave: false, theme: 'system', editorFontFamily: 'sans-serif', editorFontSize: 16, verticalWriting: false });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'outline' | 'editor'>('general');
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  const [systemFonts, setSystemFonts] = useState<string[]>([]);
   
   // For long-press time picker
   const longPressTimer = useRef<number | null>(null);
@@ -744,6 +746,13 @@ export default function SceneListPage() {
   // Initial Load & Version Check
   useEffect(() => {
     getVersion().then(v => setAppVersion(v)).catch(() => setAppVersion('Unknown'));
+    
+    // Fetch system fonts
+    import('@tauri-apps/api/core').then(({ invoke }) => {
+      invoke<string[]>('get_system_fonts')
+        .then(fonts => setSystemFonts(fonts))
+        .catch(err => console.error('Failed to load system fonts:', err));
+    });
   }, []);
 
   // Theme Application
@@ -1920,7 +1929,16 @@ ${separator}
                     >
                       <option value="sans-serif">ゴシック体 (標準)</option>
                       <option value="serif">明朝体</option>
+                      <option value='"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "MS PMincho", "MS Mincho", serif'>游明朝 (縦書き推奨)</option>
                       <option value="monospace">等幅フォント</option>
+                      {systemFonts.length > 0 && (
+                        <>
+                          <option disabled>──────────</option>
+                          {systemFonts.map(font => (
+                            <option key={font} value={`"${font}"`}>{font}</option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
                   <div className="form-group">
@@ -1940,6 +1958,20 @@ ${separator}
                         width: '100%'
                       }}
                     />
+                  </div>
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox"
+                        checked={settings.verticalWriting || false}
+                        onChange={(e) => setSettings({ ...settings, verticalWriting: e.target.checked })}
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                      />
+                      <span>縦書きモード</span>
+                    </label>
+                    <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                      日本語小説向けの縦書き表示に切り替えます。行頭禁則処理が適用されます。
+                    </small>
                   </div>
                 </>
               )}

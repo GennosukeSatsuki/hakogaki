@@ -546,3 +546,27 @@ button.secondary:hover {
     font-size: 0.85rem;
   }
 }
+
+/* Contenteditable placeholder */
+[contenteditable][data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+[contenteditable]:focus {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+/* TipTap / ProseMirror Styles */
+.ProseMirror {
+  outline: none;
+  height: 100%;
+  padding-bottom: 50px; /* Scroll space */
+}
+
+.ProseMirror p {
+  margin: 0;
+}

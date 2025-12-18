@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import TiptapEditor from '../components/TiptapEditor';
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -429,20 +430,11 @@ export default function EditorPage() {
         </button>
       </div>
       
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
+      <TiptapEditor 
+        content={content} 
+        onChange={setContent} 
+        settings={settings}
         placeholder="ここに本文を書いてください..."
-        style={{
-          flex: 1,
-          padding: '20px',
-          fontSize: settings?.editorFontSize ? `${settings.editorFontSize}px` : '16px',
-          lineHeight: '1.8',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          resize: 'none',
-          fontFamily: settings?.editorFontFamily || 'inherit'
-        }}
       />
       
       <div style={{ 
