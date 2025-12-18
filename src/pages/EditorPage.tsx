@@ -464,7 +464,7 @@ export default function EditorPage() {
                 if (s.deploymentInfo?.lastFileName && data.lastDeployPath) {
                   const chapter = data.chapters?.find((c: any) => c.id === s.deploymentInfo.chapterId);
                   if (chapter?.deploymentNumber !== undefined) {
-                    const chapterFolder = `${String(chapter.deploymentNumber).padStart(2, '0')}_${chapter.title}`;
+
 
                     
                     // localStorageから各シーンの文字数を取得（キャッシュ）
