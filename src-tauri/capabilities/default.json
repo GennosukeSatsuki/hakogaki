@@ -16,6 +16,7 @@
     "fs:allow-document-write-recursive",
     "fs:allow-download-read-recursive",
     "fs:allow-download-write-recursive",
-    "dialog:default"
+    "dialog:default",
+    "core:window:allow-close"
   ]
 }

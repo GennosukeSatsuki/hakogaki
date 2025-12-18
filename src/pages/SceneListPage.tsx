@@ -23,6 +23,8 @@ import { save, open, ask } from '@tauri-apps/plugin-dialog';
 
 import { writeTextFile, readTextFile, mkdir, exists, rename, remove } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { documentDir } from '@tauri-apps/api/path';
 
 import '../App.css';
 
@@ -775,16 +777,139 @@ export default function SceneListPage() {
     localStorage.setItem('storyData', JSON.stringify(storyData));
   }, [scenes, characters, locations, chapters, settings, lastDeployPath, nextSceneNo]); // initializedは依存配列に含めない
 
+  // Handle window close event
+  useEffect(() => {
+    const appWindow = getCurrentWindow();
+    let unlistenFn: (() => void) | null = null;
+    
+    appWindow.onCloseRequested(async (event) => {
+      // Prevent the window from closing immediately
+      event.preventDefault();
+      
+      // Ask user if they want to save before closing
+      const shouldSave = await ask('アプリを終了する前に保存しますか？', {
+        title: '終了確認',
+        kind: 'info',
+        okLabel: '保存して終了',
+        cancelLabel: '保存せずに終了'
+      });
+      
+      if (shouldSave) {
+        try {
+          // Save JSON file if path exists
+          if (currentFilePath) {
+            const data: StoryData = { 
+              scenes, 
+              characters, 
+              locations, 
+              chapters, 
+              settings, 
+              lastDeployPath: lastDeployPath ?? undefined,
+              nextSceneNo 
+            };
+            await writeTextFile(currentFilePath, JSON.stringify(data, null, 2));
+            console.log('JSON保存完了');
+          }
+          
+          // Deploy if there's a last deploy path
+          if (lastDeployPath) {
+            console.log('書き出し開始:', lastDeployPath);
+            const isWindows = typeof lastDeployPath === 'string' && lastDeployPath.includes('\\\\');
+            const sep = isWindows ? '\\\\' : '/';
+            
+            for (let i = 0; i < scenes.length; i++) {
+              const scene = scenes[i];
+              const currentChapterId = scene.chapterId || '';
+              const currentChapter = chapters?.find(c => c.id === currentChapterId);
+              const currentChapterTitle = currentChapter?.title || scene.chapter || '無題の章';
+              
+              const chapterDeploymentNumber = currentChapter?.deploymentNumber || 1;
+              const numStr = chapterDeploymentNumber.toString().padStart(2, '0');
+              const safeChapterTitle = currentChapterTitle.trim();
+              const folderName = `${numStr}_${safeChapterTitle}`;
+              const folderPath = `${lastDeployPath}${sep}${folderName}`;
+              
+              await mkdir(folderPath, { recursive: true });
+              
+              const fileNum = (i + 1).toString().padStart(3, '0');
+              const safeTitle = scene.title.trim() || '無題のシーン';
+              const fileName = `${fileNum}_${safeTitle}.txt`;
+              const filePath = `${folderPath}${sep}${fileName}`;
+              
+              const content = `タイトル: ${scene.title}
+章: ${currentChapterTitle}
+登場人物: ${scene.characters}
+時間: ${formatTimeForDisplay(scene.time, scene.timeMode)}
+場所: ${scene.place}
+狙いと役割: ${scene.aim}
+
+【あらすじ】
+${scene.summary}
+
+【裏設定・メモ】
+${scene.note}`;
+              
+              await writeTextFile(filePath, content);
+            }
+            console.log('書き出し完了');
+          }
+        } catch (e) {
+          console.error('保存に失敗しました:', e);
+          // エラーが発生しても終了は続行
+        }
+      }
+      
+      // Remove the event listener before closing to prevent infinite loop
+      console.log('イベントリスナーを解除します');
+      if (unlistenFn) {
+        unlistenFn();
+      }
+      
+      // Close the window
+      console.log('ウィンドウを閉じます');
+      await appWindow.close();
+    }).then(fn => {
+      unlistenFn = fn;
+    });
+    
+    return () => {
+      if (unlistenFn) {
+        unlistenFn();
+      }
+    };
+  }, [scenes, characters, locations, chapters, settings, lastDeployPath, nextSceneNo, currentFilePath]);
+
   const handleDeploy = async () => {
     setIsFileMenuOpen(false);
     try {
-      // 1. Select Output Directory
-      const baseDir = await open({
-        directory: true,
-        multiple: false,
-      });
-
-      if (!baseDir) return;
+      let baseDir: string;
+      
+      // Check if we're on mobile (Android/iOS)
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // On mobile, use app's document directory
+        try {
+          const docDir = await documentDir();
+          baseDir = `${docDir}/HakogakiExport`;
+          // Create the export directory if it doesn't exist
+          await mkdir(baseDir, { recursive: true });
+          alert(`モバイル版では、ファイルは以下のディレクトリに書き出されます:\n${baseDir}`);
+        } catch (e) {
+          console.error('Failed to get document directory:', e);
+          alert('書き出しディレクトリの取得に失敗しました');
+          return;
+        }
+      } else {
+        // On desktop, use folder picker
+        const selectedDir = await open({
+          directory: true,
+          multiple: false,
+        });
+        
+        if (!selectedDir) return;
+        baseDir = selectedDir;
+      }
 
       // Remember the deploy path for future use
       setLastDeployPath(baseDir);
