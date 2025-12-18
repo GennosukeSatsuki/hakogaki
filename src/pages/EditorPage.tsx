@@ -7,7 +7,7 @@ export default function EditorPage() {
   const navigate = useNavigate();
   const [content, setContent] = useState('');
   const [originalContent, setOriginalContent] = useState(''); // 変更検知用
-  const [startCharCount, setStartCharCount] = useState<number>(0); // 今日の開始時点の文字数
+
   const [loading, setLoading] = useState(true);
   const [fileExists, setFileExists] = useState(false);
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -110,17 +110,13 @@ export default function EditorPage() {
         const savedProgress = localStorage.getItem(progressKey);
         
         const currentBodyCount = getBodyCharCount(fileContent);
-        let initialCount = currentBodyCount;
         
         // 文字数をキャッシュ（総文字数計算用）
         localStorage.setItem(`sceneCharCount_${id}`, currentBodyCount.toString());
 
         if (savedProgress) {
-          const { date, count } = JSON.parse(savedProgress);
-          if (date === today) {
-            // 今日すで記録があればそれを使う
-            initialCount = count;
-          } else {
+          const { date } = JSON.parse(savedProgress);
+          if (date !== today) {
             // 日付が変わっていれば現在の文字数を開始文字数としてリセット
             localStorage.setItem(progressKey, JSON.stringify({ date: today, count: currentBodyCount }));
           }
@@ -128,7 +124,6 @@ export default function EditorPage() {
           // データがない場合は現在の文字数を開始文字数として保存
           localStorage.setItem(progressKey, JSON.stringify({ date: today, count: currentBodyCount }));
         }
-        setStartCharCount(initialCount);
       }
 
       setLoading(false);
@@ -185,14 +180,11 @@ export default function EditorPage() {
       
       // 新しいセパレーターを探す
       let separatorIndex = content.indexOf(separator);
-      let foundSeparator = separator;
+
       
       // 見つからない場合は古いセパレーターを探す
       if (separatorIndex === -1) {
         separatorIndex = content.indexOf(oldSeparator);
-        if (separatorIndex !== -1) {
-          foundSeparator = oldSeparator;
-        }
       }
       
       if (separatorIndex === -1) {
@@ -473,7 +465,7 @@ export default function EditorPage() {
                   const chapter = data.chapters?.find((c: any) => c.id === s.deploymentInfo.chapterId);
                   if (chapter?.deploymentNumber !== undefined) {
                     const chapterFolder = `${String(chapter.deploymentNumber).padStart(2, '0')}_${chapter.title}`;
-                    const path = `${data.lastDeployPath}/${chapterFolder}/${s.deploymentInfo.lastFileName}`;
+
                     
                     // localStorageから各シーンの文字数を取得（キャッシュ）
                     const cacheKey = `sceneCharCount_${s.id}`;
