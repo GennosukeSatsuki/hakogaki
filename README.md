@@ -51,7 +51,7 @@ Excelで箱書きを作っても、シーンごとのファイルにするのは
 ターミナルから（パスは普通にApplicationsに入れたときのものです）
 
 ```bash
-xattr -cr /Applications/箱書きエディタ.app
+xattr -cr /Applications/HakogakiEditor.app
 ```
 
 **Linux版**:
