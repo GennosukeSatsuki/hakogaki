@@ -61,3 +61,26 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  post-to-x:
+    needs: release
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Post to X (Twitter)
+        uses: snow-actions/tweet@v1.4.0
+        with:
+          status: |
+            📦 箱書きエディタ ${{ github.ref_name }} をリリースしました！
+
+            ダウンロード: https://github.com/GennosukeSatsuki/hakogaki/releases/tag/${{ github.ref_name }}
+
+            #箱書きエディタ #小説執筆 #創作支援
+        env:
+          CONSUMER_API_KEY: ${{ secrets.TWITTER_CONSUMER_API_KEY }}
+          CONSUMER_API_SECRET_KEY: ${{ secrets.TWITTER_CONSUMER_API_SECRET }}
+          ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
