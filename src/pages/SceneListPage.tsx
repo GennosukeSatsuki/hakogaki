@@ -563,6 +563,42 @@ export default function SceneListPage() {
     return () => clearTimeout(timer);
   }, [scenes, characters, locations, chapters, settings, currentFilePath]);
 
+  const handleNewProject = async () => {
+    setIsFileMenuOpen(false);
+    
+    // 確認ダイアログ
+    const confirmed = await ask(
+      '新規プロジェクトを作成しますか？\n\n現在のプロジェクトは保存されていない場合、失われます。',
+      { 
+        title: '新規プロジェクト', 
+        kind: 'warning',
+        okLabel: '新規作成',
+        cancelLabel: 'キャンセル'
+      }
+    );
+    
+    if (!confirmed) return;
+    
+    // 初期データを設定（サンプルデータ付き）
+    setScenes([INITIAL_SCENE]);
+    setCharacters([
+      { id: '1', name: '主人公' },
+      { id: '2', name: 'ヒロイン' },
+    ]);
+    setLocations([
+      { id: '1', name: '通学路' },
+    ]);
+    setChapters([
+      { id: '1', title: '第1章' },
+    ]);
+    setCurrentFilePath(null);
+    setLastDeployPath(null);
+    setNextSceneNo(2);
+    
+    // localStorageもクリア
+    localStorage.removeItem('storyData');
+  };
+
   const handleLoadFile = async () => {
     setIsFileMenuOpen(false);
     try {
@@ -1189,6 +1225,10 @@ ${separator}
           </button>
           {isFileMenuOpen && (
             <div className="dropdown-menu">
+              <button className="dropdown-item" onClick={handleNewProject}>
+                ✨ 新規プロジェクト
+              </button>
+              <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
               <button className="dropdown-item" onClick={() => handleOverwriteSave(false)}>
                 💾 プロジェクトを保存
               </button>

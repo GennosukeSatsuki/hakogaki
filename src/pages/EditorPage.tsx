@@ -111,6 +111,9 @@ export default function EditorPage() {
         
         const currentBodyCount = getBodyCharCount(fileContent);
         let initialCount = currentBodyCount;
+        
+        // 文字数をキャッシュ（総文字数計算用）
+        localStorage.setItem(`sceneCharCount_${id}`, currentBodyCount.toString());
 
         if (savedProgress) {
           const { date, count } = JSON.parse(savedProgress);
@@ -145,9 +148,85 @@ export default function EditorPage() {
     try {
       await writeTextFile(filePath, content);
       setOriginalContent(content); // 保存後、元の内容を更新
+      
+      // 文字数をキャッシュ（総文字数計算用）
+      const charCount = getBodyCharCount(content);
+      localStorage.setItem(`sceneCharCount_${id}`, charCount.toString());
+      
       alert('保存しました');
     } catch (e) {
       alert(`保存に失敗しました: ${e}`);
+    }
+  };
+
+  const handleMarkComplete = async () => {
+    if (!filePath) {
+      alert('ファイルパスが設定されていません');
+      return;
+    }
+
+    // 確認ダイアログ（Tauriのaskを使用）
+    const { ask } = await import('@tauri-apps/plugin-dialog');
+    const confirmed = await ask(
+      '箱書き部分（セパレーターより上）が削除され、本文のみになります。\nこの操作は元に戻せません。',
+      { 
+        title: '執筆完了', 
+        kind: 'warning',
+        okLabel: '執筆完了',
+        cancelLabel: 'キャンセル'
+      }
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const separator = '──────────────(本文執筆完了後に消してください)──────────────';
+      const oldSeparator = '────────────────────────────────';
+      
+      // 新しいセパレーターを探す
+      let separatorIndex = content.indexOf(separator);
+      let foundSeparator = separator;
+      
+      // 見つからない場合は古いセパレーターを探す
+      if (separatorIndex === -1) {
+        separatorIndex = content.indexOf(oldSeparator);
+        if (separatorIndex !== -1) {
+          foundSeparator = oldSeparator;
+        }
+      }
+      
+      if (separatorIndex === -1) {
+        alert('セパレーターが見つかりません。既に執筆完了済みの可能性があります。');
+        return;
+      }
+
+      // セパレーター以降の本文のみを抽出
+      const afterSeparator = content.substring(separatorIndex);
+      const bodyStart = afterSeparator.indexOf('\n');
+      if (bodyStart === -1) {
+        alert('本文が見つかりません。');
+        return;
+      }
+      
+      const bodyText = afterSeparator.substring(bodyStart + 1);
+      
+      // 本文のみに更新
+      setContent(bodyText);
+      
+      // ファイルに保存
+      await writeTextFile(filePath, bodyText);
+      setOriginalContent(bodyText);
+      
+      // 文字数をキャッシュ（trim()しない - 空白も含めて正確にカウント）
+      const charCount = bodyText.length;
+      localStorage.setItem(`sceneCharCount_${id}`, charCount.toString());
+      
+      // 進捗管理: startCharCountは更新しない（進捗を維持）
+      // 箱書き部分が削除されても、今日書いた文字数はそのまま維持される
+      
+      alert('執筆完了としてマークしました。箱書き部分を削除しました。');
+    } catch (e) {
+      alert(`処理に失敗しました: ${e}`);
     }
   };
 
@@ -170,13 +249,47 @@ export default function EditorPage() {
       // セパレーター行自体を除外（次の改行以降）
       const bodyStart = afterSeparator.indexOf('\n');
       if (bodyStart !== -1) {
-        const bodyText = afterSeparator.substring(bodyStart + 1).trim();
+        const bodyText = afterSeparator.substring(bodyStart + 1);
         return bodyText.length;
       }
     }
     
     // セパレーターが見つからない場合は全体をカウント
     return text.length;
+  };
+
+  // 全シーンの今日の進捗を計算
+  const getTotalTodayProgress = (): number => {
+    const savedData = localStorage.getItem('storyData');
+    if (!savedData) return 0;
+    
+    const data = JSON.parse(savedData);
+    const today = new Date().toDateString();
+    let totalProgress = 0;
+    
+    data.scenes?.forEach((s: any) => {
+      const progressKey = `dailyProgress_${s.id}`;
+      const savedProgress = localStorage.getItem(progressKey);
+      
+      if (savedProgress) {
+        const { date, count } = JSON.parse(savedProgress);
+        if (date === today) {
+          // 今日のデータがある場合
+          const cacheKey = `sceneCharCount_${s.id}`;
+          const cached = localStorage.getItem(cacheKey);
+          
+          if (s.id === id) {
+            // 現在編集中のシーン（最新の値を使用）
+            totalProgress += getBodyCharCount(content) - count;
+          } else if (cached) {
+            // 他のシーン（キャッシュから計算）
+            totalProgress += parseInt(cached, 10) - count;
+          }
+        }
+      }
+    });
+    
+    return totalProgress;
   };
 
   // 箱書き一覧に戻る処理
@@ -346,26 +459,79 @@ export default function EditorPage() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div>
-          本文文字数: {getBodyCharCount(content).toLocaleString()}文字
-          <span style={{ marginLeft: '1rem', color: 'var(--text-sub)', fontSize: '0.9em' }}>
-            （進捗: {(getBodyCharCount(content) - startCharCount) >= 0 ? '+' : ''}{(getBodyCharCount(content) - startCharCount).toLocaleString()}文字）
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ fontSize: '1.1em', fontWeight: 'bold' }}>
+            総文字数: {(() => {
+              // 全シーンの文字数を計算
+              const savedData = localStorage.getItem('storyData');
+              if (!savedData) return 0;
+              const data = JSON.parse(savedData);
+              
+              let totalChars = 0;
+              data.scenes?.forEach((s: any) => {
+                if (s.deploymentInfo?.lastFileName && data.lastDeployPath) {
+                  const chapter = data.chapters?.find((c: any) => c.id === s.deploymentInfo.chapterId);
+                  if (chapter?.deploymentNumber !== undefined) {
+                    const chapterFolder = `${String(chapter.deploymentNumber).padStart(2, '0')}_${chapter.title}`;
+                    const path = `${data.lastDeployPath}/${chapterFolder}/${s.deploymentInfo.lastFileName}`;
+                    
+                    // localStorageから各シーンの文字数を取得（キャッシュ）
+                    const cacheKey = `sceneCharCount_${s.id}`;
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) {
+                      totalChars += parseInt(cached, 10);
+                    }
+                  }
+                }
+              });
+              
+              // 現在編集中のシーンの文字数を加算（キャッシュより最新）
+              const currentSceneCache = localStorage.getItem(`sceneCharCount_${id}`);
+              if (currentSceneCache) {
+                totalChars -= parseInt(currentSceneCache, 10);
+              }
+              totalChars += getBodyCharCount(content);
+              
+              return totalChars.toLocaleString();
+            })()}字
+          </div>
+          <div>
+            このシーン: {getBodyCharCount(content).toLocaleString()}字
+            <span style={{ marginLeft: '1rem', color: 'var(--text-sub)', fontSize: '0.9em' }}>
+              （今日の執筆: {getTotalTodayProgress() >= 0 ? '+' : ''}{getTotalTodayProgress().toLocaleString()}字）
+            </span>
+          </div>
         </div>
-        <button 
-          onClick={handleSave}
-          style={{
-            padding: '10px 30px',
-            fontSize: '16px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          保存
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={handleMarkComplete}
+            style={{
+              padding: '10px 30px',
+              fontSize: '16px',
+              backgroundColor: '#FF9800',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ✓ 執筆完了
+          </button>
+          <button 
+            onClick={handleSave}
+            style={{
+              padding: '10px 30px',
+              fontSize: '16px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            保存
+          </button>
+        </div>
       </div>
     </div>
   );
