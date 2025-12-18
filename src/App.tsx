@@ -20,15 +20,21 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { save, open, ask } from '@tauri-apps/plugin-dialog';
 
-import { writeTextFile, readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { writeTextFile, readTextFile, mkdir, exists, rename, remove } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
 
 import './App.css';
 
+// Deployment tracking information
+interface DeploymentInfo {
+  chapterId: string;      // 書き出し時の章ID
+  lastFileName: string;   // 前回書き出し時のファイル名（リネーム検出用）
+}
+
 // Type definition for a Scene
-// Scene No removed from type as it is derived from order
 interface Scene {
   id: string;
+  sceneNo: number; // 絶対的なシーン番号（削除されても欠番になる）
   title: string; // シーンタイトル
   chapter: string; // 章タイトル (Deprecated: for display/compatibility)
   chapterId?: string; // 章ID (New)
@@ -40,6 +46,7 @@ interface Scene {
   aim: string; // 狙いと役割
   summary: string; // 詳細なあらすじ
   note: string; // 裏設定
+  deploymentInfo?: DeploymentInfo; // 書き出し情報（初回書き出し時に設定）
 }
 
 interface Character {
@@ -55,6 +62,7 @@ interface Location {
 interface Chapter {
   id: string;
   title: string;
+  deploymentNumber?: number; // 書き出し時の章番号（初回書き出し時に割り当て）
 }
 
 interface AppSettings {
@@ -72,10 +80,12 @@ interface StoryData {
   chapters?: Chapter[];
   settings?: AppSettings;
   lastDeployPath?: string; // Last directory path used for deployment
+  nextSceneNo?: number; // 次に割り当てるシーン番号
 }
 
 const INITIAL_SCENE: Scene = {
   id: '1',
+  sceneNo: 1,
   title: '物語の始まり',
   chapter: '第1章',
   chapterId: '1',
@@ -204,6 +214,7 @@ function App() {
   ]);
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [lastDeployPath, setLastDeployPath] = useState<string | null>(null); // For future use
+  const [nextSceneNo, setNextSceneNo] = useState(2); // 次に割り当てるシーン番号（INITIAL_SCENEが1なので2からスタート）
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Scene | null>(null);
@@ -256,6 +267,7 @@ function App() {
   const handleAddScene = () => {
     const newScene: Scene = {
       id: crypto.randomUUID(),
+      sceneNo: nextSceneNo,
       title: '',
       chapter: '',
       characters: '',
@@ -266,6 +278,7 @@ function App() {
       note: '',
     };
     setScenes([...scenes, newScene]);
+    setNextSceneNo(nextSceneNo + 1); // 次のシーン番号をインクリメント
     startEditing(newScene);
   };
 
@@ -436,7 +449,15 @@ function App() {
       });
       
       if (path) {
-        const data: StoryData = { scenes, characters, locations, chapters, settings, lastDeployPath: lastDeployPath ?? undefined };
+        const data: StoryData = { 
+          scenes, 
+          characters, 
+          locations, 
+          chapters, 
+          settings, 
+          lastDeployPath: lastDeployPath ?? undefined,
+          nextSceneNo 
+        };
         await writeTextFile(path, JSON.stringify(data, null, 2));
         setCurrentFilePath(path);
         alert('保存しました');
@@ -455,7 +476,15 @@ function App() {
     }
 
     try {
-      const data: StoryData = { scenes, characters, locations, chapters, settings, lastDeployPath: lastDeployPath ?? undefined };
+      const data: StoryData = { 
+        scenes, 
+        characters, 
+        locations, 
+        chapters, 
+        settings, 
+        lastDeployPath: lastDeployPath ?? undefined,
+        nextSceneNo 
+      };
       await writeTextFile(currentFilePath, JSON.stringify(data, null, 2));
       if (!silent) alert('上書き保存しました');
       else console.log('Auto saved');
@@ -512,8 +541,8 @@ function App() {
              name
           }));
 
-          // Map scenes to character IDs
-          newScenes.forEach(s => {
+          // Map scenes to character IDs and assign sceneNo
+          newScenes.forEach((s, index) => {
              s.characterIds = [];
              if (s.characters) {
                const names = s.characters.split(/[,、]/).map(c => c.trim());
@@ -521,6 +550,10 @@ function App() {
                  const found = newCharacters.find(c => c.name === n);
                  if (found) s.characterIds?.push(found.id);
                });
+             }
+             // Assign sceneNo if not present (legacy migration)
+             if (!s.sceneNo) {
+               s.sceneNo = index + 1;
              }
           });
 
@@ -544,6 +577,10 @@ function App() {
           }));
           
           setChapters(newChapters);
+          
+          // Set nextSceneNo to the next available number
+          const maxSceneNo = Math.max(...newScenes.map(s => s.sceneNo || 0), 0);
+          setNextSceneNo(maxSceneNo + 1);
 
           alert('読み込みました (旧形式変換済み)');
         } else if (parsed.scenes && parsed.characters) {
@@ -571,6 +608,13 @@ function App() {
               });
           }
 
+          // Assign sceneNo to scenes that don't have it (backward compatibility)
+          loadedScenes.forEach((s, index) => {
+            if (!s.sceneNo) {
+              s.sceneNo = index + 1;
+            }
+          });
+
           setScenes(loadedScenes);
           setCharacters(parsed.characters);
           setChapters(loadedChapters);
@@ -583,6 +627,15 @@ function App() {
           if (parsed.lastDeployPath) {
             setLastDeployPath(parsed.lastDeployPath);
           }
+          
+          // Restore nextSceneNo or calculate it from existing scenes
+          if (parsed.nextSceneNo) {
+            setNextSceneNo(parsed.nextSceneNo);
+          } else {
+            const maxSceneNo = Math.max(...loadedScenes.map(s => s.sceneNo || 0), 0);
+            setNextSceneNo(maxSceneNo + 1);
+          }
+          
           alert('読み込みました');
         } else {
           alert('ファイル形式が正しくありません');
@@ -654,49 +707,169 @@ function App() {
       setLastDeployPath(baseDir);
 
       // Simple separator detection (not perfect but works for most cases provided by dialog)
-      const isWindows = typeof baseDir === 'string' && baseDir.includes('\\');
-      const sep = isWindows ? '\\' : '/';
+      const isWindows = typeof baseDir === 'string' && baseDir.includes('\\\\');
+      const sep = isWindows ? '\\\\' : '/';
 
-      let chapterCount = 0;
-      let lastChapterTitle = '';
-
-      // We need to keep track of folder paths to avoid recreating existing ones in loop if contiguous
-      // But requirement says: "Chapter name changes -> count up".
-      // If chapter name is same as previous, we use the same folder.
+      // Track chapters and assign deployment numbers
+      const updatedChapters = [...chapters];
+      let nextChapterDeploymentNumber = Math.max(...chapters.map(c => c.deploymentNumber || 0), 0) + 1;
+      
+      // Assign deployment numbers to chapters that don't have them yet
+      const chapterDeploymentMap = new Map<string, number>();
+      for (const chapter of updatedChapters) {
+        if (chapter.deploymentNumber) {
+          chapterDeploymentMap.set(chapter.id, chapter.deploymentNumber);
+        }
+      }
+      
+      // Track scenes that need deployment info updates
+      const updatedScenes = [...scenes];
+      let currentFileNumber = 0;
 
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
         
-        // Check if chapter changed
-        const currentChapterTitle = scene.chapterId 
-            ? chapters?.find(c => c.id === scene.chapterId)?.title 
-            : scene.chapter;
-            
-        if (currentChapterTitle !== lastChapterTitle || i === 0) {
-          chapterCount++;
-          lastChapterTitle = currentChapterTitle || '';
+        // Get current chapter info
+        const currentChapterId = scene.chapterId || '';
+        const currentChapter = chapters?.find(c => c.id === currentChapterId);
+        const currentChapterTitle = currentChapter?.title || scene.chapter || '無題の章';
+        
+        // File number is always current position
+        const fileNumberToUse = i + 1;
+
+        // Determine chapter deployment number
+        let chapterDeploymentNumber: number;
+        let chapterIdToStore: string = currentChapterId;
+        
+        if (scene.deploymentInfo) {
+          // Already deployed - get chapter deployment number
+          const deployedChapterId = scene.deploymentInfo.chapterId;
+          
+          if (deployedChapterId === currentChapterId) {
+            // Same chapter - use existing chapter deployment number
+            const deployedChapter = chapters?.find(c => c.id === deployedChapterId);
+            chapterDeploymentNumber = deployedChapter?.deploymentNumber || chapterDeploymentMap.get(deployedChapterId) || 0;
+          } else {
+            // Chapter changed - get new chapter's deployment number
+            if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
+              chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
+            } else if (currentChapterId && currentChapter?.deploymentNumber) {
+              chapterDeploymentNumber = currentChapter.deploymentNumber;
+              chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
+            } else {
+              // Assign new deployment number to this chapter
+              chapterDeploymentNumber = nextChapterDeploymentNumber++;
+              if (currentChapterId) {
+                chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
+                const chapterIndex = updatedChapters.findIndex(c => c.id === currentChapterId);
+                if (chapterIndex !== -1) {
+                  updatedChapters[chapterIndex] = {
+                    ...updatedChapters[chapterIndex],
+                    deploymentNumber: chapterDeploymentNumber
+                  };
+                }
+              }
+            }
+          }
+        } else {
+          // First deployment
+          if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
+            chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
+          } else if (currentChapterId && currentChapter?.deploymentNumber) {
+            chapterDeploymentNumber = currentChapter.deploymentNumber;
+            chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
+          } else {
+            // Assign new deployment number to this chapter
+            chapterDeploymentNumber = nextChapterDeploymentNumber++;
+            if (currentChapterId) {
+              chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
+              const chapterIndex = updatedChapters.findIndex(c => c.id === currentChapterId);
+              if (chapterIndex !== -1) {
+                updatedChapters[chapterIndex] = {
+                  ...updatedChapters[chapterIndex],
+                  deploymentNumber: chapterDeploymentNumber
+                };
+              }
+            }
+          }
         }
 
         // Create Chapter Folder Name: XX_ChapterName
-        const numStr = chapterCount.toString().padStart(2, '0');
-        // Sanitize folder name slightly to avoid illegal chars if possible, 
-        // though user might want exact match. Just a precaution for invalid chars could be complex,
-        // trusting user input for now or minimal replacement.
-        const safeChapterTitle = (lastChapterTitle || '無題の章').trim();
+        const numStr = chapterDeploymentNumber.toString().padStart(2, '0');
+        const safeChapterTitle = currentChapterTitle.trim();
         const folderName = `${numStr}_${safeChapterTitle}`;
         const folderPath = `${baseDir}${sep}${folderName}`;
 
         // Create Directory
-        // ensure recursive false to error if we really messed up? 
-        // Actually recursive: true is safer if it already exists it just succeeds.
         await mkdir(folderPath, { recursive: true });
 
-        // Create File Name: (SceneNum)_(SceneName).txt
-        // Scene number is current index + 1
-        const sceneNum = (i + 1).toString().padStart(3, '0');
+        // Create File Name: (FileNum)_(SceneName).txt
+        const fileNum = fileNumberToUse.toString().padStart(3, '0');
         const safeTitle = scene.title.trim() || '無題のシーン';
-        const fileName = `${sceneNum}_${safeTitle}.txt`;
+        const fileName = `${fileNum}_${safeTitle}.txt`;
         const filePath = `${folderPath}${sep}${fileName}`;
+        
+        // Check if chapter changed (need to move file)
+        if (scene.deploymentInfo && scene.deploymentInfo.chapterId !== chapterIdToStore) {
+          // Chapter changed - need to move file from old chapter folder to new chapter folder
+          const oldChapterId = scene.deploymentInfo.chapterId;
+          const oldChapter = chapters?.find(c => c.id === oldChapterId);
+          const oldChapterDeploymentNumber = oldChapter?.deploymentNumber || chapterDeploymentMap.get(oldChapterId) || 0;
+          const oldChapterTitle = oldChapter?.title || '無題の章';
+          
+          const oldNumStr = oldChapterDeploymentNumber.toString().padStart(2, '0');
+          const oldFolderName = `${oldNumStr}_${oldChapterTitle.trim()}`;
+          const oldFolderPath = `${baseDir}${sep}${oldFolderName}`;
+          const oldFileName = scene.deploymentInfo.lastFileName || fileName;
+          const oldFilePath = `${oldFolderPath}${sep}${oldFileName}`;
+          
+          // Read old file content if it exists
+          if (await exists(oldFilePath)) {
+            console.log(`Moving file from ${oldFolderName}/${oldFileName} to ${folderName}/${fileName}`);
+            try {
+              const fileContent = await readTextFile(oldFilePath);
+              // Write to new location
+              await writeTextFile(filePath, fileContent);
+              // Delete old file
+              await remove(oldFilePath);
+            } catch (e) {
+              console.error(`Failed to move file: ${e}`);
+              // Continue anyway - will create new file if move fails
+            }
+          }
+        }
+        // Check if file needs to be renamed (title changed, same chapter)
+        else if (scene.deploymentInfo && scene.deploymentInfo.lastFileName && scene.deploymentInfo.lastFileName !== fileName) {
+          const oldFilePath = `${folderPath}${sep}${scene.deploymentInfo.lastFileName}`;
+          if (await exists(oldFilePath)) {
+            console.log(`Renaming: ${scene.deploymentInfo.lastFileName} -> ${fileName}`);
+            try {
+              await rename(oldFilePath, filePath);
+            } catch (e) {
+              console.error(`Failed to rename file: ${e}`);
+              // Continue anyway - will create new file if rename fails
+            }
+          }
+        }
+        
+        // Update deployment info with current file name
+        if (!scene.deploymentInfo) {
+          updatedScenes[i] = {
+            ...updatedScenes[i],
+            deploymentInfo: {
+              chapterId: chapterIdToStore,
+              lastFileName: fileName
+            }
+          };
+        } else {
+          updatedScenes[i] = {
+            ...updatedScenes[i],
+            deploymentInfo: {
+              chapterId: chapterIdToStore,
+              lastFileName: fileName
+            }
+          };
+        }
         
         // Create box-writing metadata content with separator note
         const separator = '──────────────(本文執筆完了後に消してください)──────────────';
@@ -745,7 +918,7 @@ ${separator}
               const existingBoxContent = existingContent.substring(0, separatorIndex + foundSeparator.length + 1);
               
               // Extract body content (after separator)
-              const bodyContent = existingContent.substring(separatorIndex).replace(new RegExp(`^${foundSeparator.replace(/[()]/g, '\\$&')}\\s*\\n+`), '');
+              const bodyContent = existingContent.substring(separatorIndex).replace(new RegExp(`^${foundSeparator.replace(/[()]/g, '\\\\$&')}\\s*\\n+`), '');
               
               // Compare box-writing sections (normalize separator for comparison)
               const normalizedExisting = existingBoxContent.replace(oldSeparator, separator).trim();
@@ -774,6 +947,12 @@ ${separator}
           await writeTextFile(filePath, finalContent);
         }
       }
+
+      // Update scenes with deployment info
+      setScenes(updatedScenes);
+      
+      // Update chapters with deployment numbers
+      setChapters(updatedChapters);
 
       alert('書き出しが完了しました');
 
