@@ -22,79 +22,24 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { save, open, ask } from '@tauri-apps/plugin-dialog';
 
-import { writeTextFile, readTextFile, mkdir, exists, rename, remove } from '@tauri-apps/plugin-fs';
+import { writeTextFile, readTextFile, mkdir } from '@tauri-apps/plugin-fs';
 import { getVersion } from '@tauri-apps/api/app';
 import { documentDir } from '@tauri-apps/api/path';
 
 import '../App.css';
 
-// Deployment tracking information
-interface DeploymentInfo {
-  chapterId: string;      // 書き出し時の章ID
-  lastFileName: string;   // 前回書き出し時のファイル名（リネーム検出用）
-}
+import { 
+  Scene, 
+  Character, 
+  Location, 
+  Chapter, 
+  AppSettings, 
+  DailyProgress, 
+  StoryData, 
+  exportProject
+} from '../utils/exportUtils';
 
-// Type definition for a Scene
-interface Scene {
-  id: string;
-  sceneNo: number; // 絶対的なシーン番号（削除されても欠番になる）
-  title: string; // シーンタイトル
-  chapter: string; // 章タイトル (Deprecated: for display/compatibility)
-  chapterId?: string; // 章ID (New)
-  characters: string; // 登場人物 (Deprecated: for display/compatibility)
-  characterIds?: string[]; // 登場人物IDリスト (New)
-  time: string; // 時間 (text or ISO datetime)
-  timeMode?: 'text' | 'datetime'; // How time was entered
-  place: string; // 場所
-  aim: string; // 狙いと役割
-  summary: string; // 詳細なあらすじ
-  note: string; // 裏設定
-  deploymentInfo?: DeploymentInfo; // 書き出し情報（初回書き出し時に設定）
-}
 
-interface Character {
-  id: string;
-  name: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-}
-
-interface Chapter {
-  id: string;
-  title: string;
-  deploymentNumber?: number; // 書き出し時の章番号（初回書き出し時に割り当て）
-}
-
-export interface AppSettings {
-  timeInputMode: 'text' | 'datetime';
-  placeInputMode: 'text' | 'select';
-  autoSave: boolean;
-  theme: 'system' | 'light' | 'dark';
-  editorFontFamily?: string;
-  editorFontSize?: number;
-  verticalWriting?: boolean;
-}
-
-interface DailyProgress {
-  date: string;
-  startingCounts: Record<string, number>; // sceneId -> char count at start of day
-}
-
-// Data structure for saving/loading
-export interface StoryData {
-  scenes: Scene[];
-  characters: Character[];
-  locations?: Location[];
-  chapters?: Chapter[];
-  settings?: AppSettings;
-  lastDeployPath?: string | null; // Last directory path used for deployment
-  nextSceneNo?: number; // 次に割り当てるシーン番号
-  dailyProgress?: DailyProgress;
-  currentFilePath?: string | null;
-}
 
 const INITIAL_SCENE: Scene = {
   id: '1',
@@ -206,25 +151,6 @@ function SceneCardOverlay({ scene, chapterList }: { scene: Scene, chapterList: C
 }
 
 
-// Helper function to format datetime for display
-const formatTimeForDisplay = (time: string, mode?: 'text' | 'datetime'): string => {
-  if (!time) return '-';
-  if (mode === 'datetime') {
-    try {
-      const date = new Date(time);
-      return date.toLocaleString('ja-JP', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric', 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    } catch {
-      return time;
-    }
-  }
-  return time;
-};
 
 export default function SceneListPage() {
   const navigate = useNavigate();
@@ -898,251 +824,21 @@ export default function SceneListPage() {
       // Remember the deploy path for future use
       setLastDeployPath(baseDir);
 
-      // Simple separator detection (not perfect but works for most cases provided by dialog)
-      const isWindows = typeof baseDir === 'string' && baseDir.includes('\\\\');
-      const sep = isWindows ? '\\\\' : '/';
+      const storyData: StoryData = {
+        scenes,
+        characters,
+        locations,
+        chapters,
+        settings,
+        lastDeployPath: baseDir,
+        nextSceneNo,
+        dailyProgress: dailyProgress ?? undefined
+      };
 
-      // Track chapters and assign deployment numbers
-      const updatedChapters = [...chapters];
-      let nextChapterDeploymentNumber = Math.max(...chapters.map(c => c.deploymentNumber || 0), 0) + 1;
-      
-      // Assign deployment numbers to chapters that don't have them yet
-      const chapterDeploymentMap = new Map<string, number>();
-      for (const chapter of updatedChapters) {
-        if (chapter.deploymentNumber) {
-          chapterDeploymentMap.set(chapter.id, chapter.deploymentNumber);
-        }
-      }
-      
-      // Track scenes that need deployment info updates
-      const updatedScenes = [...scenes];
+      const { scenes: updatedScenes, chapters: updatedChapters } = await exportProject(storyData, baseDir);
 
-      for (let i = 0; i < scenes.length; i++) {
-        const scene = scenes[i];
-        
-        // Get current chapter info
-        const currentChapterId = scene.chapterId || '';
-        const currentChapter = chapters?.find(c => c.id === currentChapterId);
-        const currentChapterTitle = currentChapter?.title || scene.chapter || '無題の章';
-        
-        // File number is always current position
-        const fileNumberToUse = i + 1;
-
-        // Determine chapter deployment number
-        let chapterDeploymentNumber: number;
-        let chapterIdToStore: string = currentChapterId;
-        
-        if (scene.deploymentInfo) {
-          // Already deployed - get chapter deployment number
-          const deployedChapterId = scene.deploymentInfo.chapterId;
-          
-          if (deployedChapterId === currentChapterId) {
-            // Same chapter - use existing chapter deployment number
-            const deployedChapter = chapters?.find(c => c.id === deployedChapterId);
-            chapterDeploymentNumber = deployedChapter?.deploymentNumber || chapterDeploymentMap.get(deployedChapterId) || 0;
-          } else {
-            // Chapter changed - get new chapter's deployment number
-            if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
-              chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
-            } else if (currentChapterId && currentChapter?.deploymentNumber) {
-              chapterDeploymentNumber = currentChapter.deploymentNumber;
-              chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-            } else {
-              // Assign new deployment number to this chapter
-              chapterDeploymentNumber = nextChapterDeploymentNumber++;
-              if (currentChapterId) {
-                chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-                const chapterIndex = updatedChapters.findIndex(c => c.id === currentChapterId);
-                if (chapterIndex !== -1) {
-                  updatedChapters[chapterIndex] = {
-                    ...updatedChapters[chapterIndex],
-                    deploymentNumber: chapterDeploymentNumber
-                  };
-                }
-              }
-            }
-          }
-        } else {
-          // First deployment
-          if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
-            chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
-          } else if (currentChapterId && currentChapter?.deploymentNumber) {
-            chapterDeploymentNumber = currentChapter.deploymentNumber;
-            chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-          } else {
-            // Assign new deployment number to this chapter
-            chapterDeploymentNumber = nextChapterDeploymentNumber++;
-            if (currentChapterId) {
-              chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-              const chapterIndex = updatedChapters.findIndex(c => c.id === currentChapterId);
-              if (chapterIndex !== -1) {
-                updatedChapters[chapterIndex] = {
-                  ...updatedChapters[chapterIndex],
-                  deploymentNumber: chapterDeploymentNumber
-                };
-              }
-            }
-          }
-        }
-
-        // Create Chapter Folder Name: XX_ChapterName
-        const numStr = chapterDeploymentNumber.toString().padStart(2, '0');
-        const safeChapterTitle = currentChapterTitle.trim();
-        const folderName = `${numStr}_${safeChapterTitle}`;
-        const folderPath = `${baseDir}${sep}${folderName}`;
-
-        // Create Directory
-        await mkdir(folderPath, { recursive: true });
-
-        // Create File Name: (FileNum)_(SceneName).txt
-        const fileNum = fileNumberToUse.toString().padStart(3, '0');
-        const safeTitle = scene.title.trim() || '無題のシーン';
-        const fileName = `${fileNum}_${safeTitle}.txt`;
-        const filePath = `${folderPath}${sep}${fileName}`;
-        
-        // Check if chapter changed (need to move file)
-        if (scene.deploymentInfo && scene.deploymentInfo.chapterId !== chapterIdToStore) {
-          // Chapter changed - need to move file from old chapter folder to new chapter folder
-          const oldChapterId = scene.deploymentInfo.chapterId;
-          const oldChapter = chapters?.find(c => c.id === oldChapterId);
-          const oldChapterDeploymentNumber = oldChapter?.deploymentNumber || chapterDeploymentMap.get(oldChapterId) || 0;
-          const oldChapterTitle = oldChapter?.title || '無題の章';
-          
-          const oldNumStr = oldChapterDeploymentNumber.toString().padStart(2, '0');
-          const oldFolderName = `${oldNumStr}_${oldChapterTitle.trim()}`;
-          const oldFolderPath = `${baseDir}${sep}${oldFolderName}`;
-          const oldFileName = scene.deploymentInfo.lastFileName || fileName;
-          const oldFilePath = `${oldFolderPath}${sep}${oldFileName}`;
-          
-          // Read old file content if it exists
-          if (await exists(oldFilePath)) {
-            console.log(`Moving file from ${oldFolderName}/${oldFileName} to ${folderName}/${fileName}`);
-            try {
-              const fileContent = await readTextFile(oldFilePath);
-              // Write to new location
-              await writeTextFile(filePath, fileContent);
-              // Delete old file
-              await remove(oldFilePath);
-            } catch (e) {
-              console.error(`Failed to move file: ${e}`);
-              // Continue anyway - will create new file if move fails
-            }
-          }
-        }
-        // Check if file needs to be renamed (title changed, same chapter)
-        else if (scene.deploymentInfo && scene.deploymentInfo.lastFileName && scene.deploymentInfo.lastFileName !== fileName) {
-          const oldFilePath = `${folderPath}${sep}${scene.deploymentInfo.lastFileName}`;
-          if (await exists(oldFilePath)) {
-            console.log(`Renaming: ${scene.deploymentInfo.lastFileName} -> ${fileName}`);
-            try {
-              await rename(oldFilePath, filePath);
-            } catch (e) {
-              console.error(`Failed to rename file: ${e}`);
-              // Continue anyway - will create new file if rename fails
-            }
-          }
-        }
-        
-        // Update deployment info with current file name
-        if (!scene.deploymentInfo) {
-          updatedScenes[i] = {
-            ...updatedScenes[i],
-            deploymentInfo: {
-              chapterId: chapterIdToStore,
-              lastFileName: fileName
-            }
-          };
-        } else {
-          updatedScenes[i] = {
-            ...updatedScenes[i],
-            deploymentInfo: {
-              chapterId: chapterIdToStore,
-              lastFileName: fileName
-            }
-          };
-        }
-        
-        // Create box-writing metadata content with separator note
-        const separator = '──────────────(本文執筆完了後に消してください)──────────────';
-        const boxContent = `**場所** ${scene.place}
-**時間** ${formatTimeForDisplay(scene.time, scene.timeMode)}
-
-**登場人物** ${scene.characterIds?.map(id => characters.find(c => c.id === id)?.name).filter(Boolean).join(', ') || scene.characters}
-
-**狙いと役割** ${scene.aim}
-
-**詳細なあらすじ** ${scene.summary}
-
-**裏設定** ${scene.note}
-
-${separator}
-
-`;
-
-        let shouldWrite = true;
-        let finalContent = boxContent;
-
-        // If file already exists, read existing content and compare
-        if (await exists(filePath)) {
-          console.log(`File exists: ${fileName}`);
-          try {
-            const existingContent = await readTextFile(filePath);
-            
-            // Find separator line (check for both old and new format)
-            const oldSeparator = '────────────────────────────────';
-            const newSeparatorPattern = /──────────────\(本文執筆完了後に消してください\)──────────────/;
-            
-            let separatorIndex = existingContent.search(newSeparatorPattern);
-            let foundSeparator = separator;
-            
-            if (separatorIndex === -1) {
-              // Try old separator format
-              separatorIndex = existingContent.indexOf(oldSeparator);
-              if (separatorIndex !== -1) {
-                foundSeparator = oldSeparator;
-              }
-            }
-            
-            if (separatorIndex !== -1) {
-              // Separator found - file is still in draft mode
-              // Extract existing box-writing section (before separator)
-              const existingBoxContent = existingContent.substring(0, separatorIndex + foundSeparator.length + 1);
-              
-              // Extract body content (after separator)
-              const bodyContent = existingContent.substring(separatorIndex).replace(new RegExp(`^${foundSeparator.replace(/[()]/g, '\\\\$&')}\\s*\\n+`), '');
-              
-              // Compare box-writing sections (normalize separator for comparison)
-              const normalizedExisting = existingBoxContent.replace(oldSeparator, separator).trim();
-              const normalizedNew = boxContent.trim();
-              
-              if (normalizedExisting === normalizedNew) {
-                console.log(`Box content unchanged, skipping: ${fileName}`);
-                shouldWrite = false;
-              } else {
-                console.log(`Box content changed, updating: ${fileName}`);
-                finalContent = boxContent + bodyContent;
-              }
-            } else {
-              // No separator found - writing is complete, skip updating
-              console.log(`No separator found (writing complete), skipping: ${fileName}`);
-              shouldWrite = false;
-            }
-          } catch (e) {
-            console.error(`Error reading existing file: ${fileName}`, e);
-            // If read fails, write new content
-          }
-        }
-
-        // Only write if needed
-        if (shouldWrite) {
-          await writeTextFile(filePath, finalContent);
-        }
-      }
-
-      // Update scenes with deployment info
+      // Update state with deployment results
       setScenes(updatedScenes);
-      
-      // Update chapters with deployment numbers
       setChapters(updatedChapters);
 
       alert('書き出しが完了しました');
