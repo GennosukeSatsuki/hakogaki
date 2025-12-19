@@ -2,7 +2,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextSelection } from '@tiptap/pm/state';
 import { useEffect } from 'react';
-import { AppSettings } from '../pages/SceneListPage';
+import { AppSettings } from '../utils/exportUtils';
 
 interface TiptapEditorProps {
   content: string;
