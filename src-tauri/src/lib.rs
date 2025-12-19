@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "android"))]
 use font_kit::source::SystemSource;
 use std::collections::HashSet;
 
@@ -9,20 +10,28 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 fn get_system_fonts() -> Vec<String> {
-    let source = SystemSource::new();
-    let mut font_names = HashSet::new();
-    
-    // Get all font families
-    if let Ok(families) = source.all_families() {
-        for family in families {
-            font_names.insert(family);
+    #[cfg(not(target_os = "android"))]
+    {
+        let source = SystemSource::new();
+        let mut font_names = HashSet::new();
+        
+        // Get all font families
+        if let Ok(families) = source.all_families() {
+            for family in families {
+                font_names.insert(family);
+            }
         }
+        
+        // Convert to sorted vector
+        let mut fonts: Vec<String> = font_names.into_iter().collect();
+        fonts.sort();
+        fonts
     }
-    
-    // Convert to sorted vector
-    let mut fonts: Vec<String> = font_names.into_iter().collect();
-    fonts.sort();
-    fonts
+    #[cfg(target_os = "android")]
+    {
+        // Android doesn't support font-kit well due to fontconfig dependency
+        vec![]
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
