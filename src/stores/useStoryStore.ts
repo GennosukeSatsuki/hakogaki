@@ -37,6 +37,7 @@ interface StoryState {
   updateChapter: (id: string, updates: Partial<Chapter>) => void;
   deleteChapter: (id: string) => void;
   
+  updateScene: (id: string, updates: Partial<Scene>) => void;
   resetProject: () => void;
 }
 
@@ -125,6 +126,10 @@ export const useStoryStore = create<StoryState>()(
       })),
       deleteChapter: (id) => set(state => ({
          chapters: state.chapters.filter(c => c.id !== id)
+      })),
+
+      updateScene: (id, updates) => set(state => ({
+         scenes: state.scenes.map(s => s.id === id ? { ...s, ...updates } : s)
       })),
 
       resetProject: () => set({
