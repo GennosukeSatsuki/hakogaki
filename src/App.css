@@ -18,6 +18,8 @@
   --radius-lg: 12px;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --transition: 0.2s ease;
+  --card-texture: url('/textures/texture_light.png');
+  --bg-texture: url('/textures/texture_corkboard.png');
 }
 
 /* Dark Mode */
@@ -35,6 +37,8 @@
   --border-focus: #5468ff;
   --primary: #5468ff;
   --primary-hover: #4254cb;
+  --card-texture: url('/textures/texture_dark.png');
+  --bg-texture: url('/textures/texture_blackboard.png');
 }
 
 * {
@@ -167,6 +171,12 @@ main {
   min-height: 0; /* flexboxでのスクロール問題を解決 */
 }
 
+main.textured {
+  background-image: var(--bg-texture);
+  background-repeat: repeat;
+  background-size: 400px; /* Adjust scale for better realism */
+}
+
 /* Scene List (Grid) */
 .scene-grid {
   display: grid;
@@ -185,6 +195,11 @@ main {
   gap: 0.75rem;
   transition: transform var(--transition), box-shadow var(--transition);
   position: relative;
+}
+
+.scene-card.textured {
+  background-image: var(--card-texture);
+  background-repeat: repeat;
 }
 
 .drag-handle {
@@ -600,4 +615,83 @@ button.secondary:hover {
 
 .ProseMirror p:last-child {
   margin-bottom: 0;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-input);
+  transition: .4s;
+  border: 1px solid var(--border-subtle);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+input:checked + .slider {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.slider.round {
+  border-radius: 24px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+/* Completed Stamp */
+.completed-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-15deg);
+  border: 3px solid rgba(255, 68, 68, 0.8);
+  color: rgba(255, 68, 68, 0.8);
+  font-size: 1.5rem;
+  font-weight: 900;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+  user-select: none;
+  font-family: serif;
+  box-shadow: 0 0 2px rgba(255, 68, 68, 0.2);
 }

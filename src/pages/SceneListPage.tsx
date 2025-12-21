@@ -65,10 +65,11 @@ interface SortableSceneCardProps {
   chapterList: Chapter[];
   onClick: (scene: Scene) => void;
   onEdit: (sceneId: string) => void;  // 追加: エディタに遷移
+  settings: AppSettings;
   isHiddenFull?: boolean; // For DragOverlay
 }
 
-function SortableSceneCard({ scene, chapterList, onClick, onEdit, isHiddenFull }: SortableSceneCardProps) {
+function SortableSceneCard({ scene, chapterList, onClick, onEdit, settings, isHiddenFull }: SortableSceneCardProps) {
   const { t } = useTranslation();
   const {
     attributes,
@@ -95,7 +96,7 @@ function SortableSceneCard({ scene, chapterList, onClick, onEdit, isHiddenFull }
     <div
       ref={setNodeRef}
       style={style}
-      className="scene-card"
+      className={`scene-card ${settings.useTextureBackground ? 'textured' : ''}`}
       onClick={() => onClick(scene)}
     >
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -114,7 +115,11 @@ function SortableSceneCard({ scene, chapterList, onClick, onEdit, isHiddenFull }
         </button>
       </div>
 
-      <div className="card-title" style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>
+      <div className="card-title" style={{ fontWeight: 'bold', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span style={{ 
+          color: scene.chapterId ? (chapterList.find(c => c.id === scene.chapterId)?.color || 'var(--primary)') : 'var(--primary)',
+          fontSize: '1.2em'
+        }}>■</span>
         {scene.title || t('scene.noTitle')}
       </div>
 
@@ -129,19 +134,26 @@ function SortableSceneCard({ scene, chapterList, onClick, onEdit, isHiddenFull }
           {scene.summary ? (scene.summary.length > 80 ? scene.summary.substring(0, 80) + '...' : scene.summary) : t('scene.noSummary')}
         </span>
       </div>
+
+      {scene.isCompleted && (
+        <div className="completed-stamp">
+          {t('common.completed')}
+        </div>
+      )}
     </div>
   );
 }
 
 // Plain component for DragOverlay
-function SceneCardOverlay({ scene, chapterList }: { scene: Scene, chapterList: Chapter[] }) {
+function SceneCardOverlay({ scene, chapterList, settings }: { scene: Scene, chapterList: Chapter[], settings: AppSettings }) {
   return (
     <SortableSceneCard 
       scene={scene} 
       chapterList={chapterList}
-      onClick={() => {}}
-      onEdit={() => {}}
-      isHiddenFull 
+      settings={settings}
+      onClick={() => {}} 
+      onEdit={() => {}} 
+      isHiddenFull={true}
     />
   );
 }
@@ -351,13 +363,17 @@ export default function SceneListPage() {
   // Chapter Management Handlers
   const addChapter = async () => {
     if (newChapterTitle && newChapterTitle.trim()) {
-      setChapters(prev => [...prev, { id: crypto.randomUUID(), title: newChapterTitle.trim() }]);
+      setChapters(prev => [...prev, { 
+        id: crypto.randomUUID(), 
+        title: newChapterTitle.trim(),
+        color: '#5468ff' // Default color
+      }]);
       setNewChapterTitle(''); // Clear input
     }
   };
 
-  const updateChapter = (id: string, title: string) => {
-    setChapters(chapters.map(c => c.id === id ? { ...c, title } : c));
+  const updateChapter = (id: string, updates: Partial<Chapter>) => {
+    setChapters(chapters.map(c => c.id === id ? { ...c, ...updates } : c));
   };
   
   const deleteChapter = async (id: string) => {
@@ -809,7 +825,14 @@ export default function SceneListPage() {
         // On mobile, use app's document directory
         try {
           const docDir = await documentDir();
-          baseDir = `${docDir}/HakoGraphExport`;
+          
+          let projectName = 'HakoGraphExport';
+          if (currentFilePath) {
+            const fileName = currentFilePath.split(/[/\\]/).pop() || '';
+            projectName = fileName.replace(/\.json$/i, '') || 'HakoGraphExport';
+          }
+
+          baseDir = `${docDir}/${projectName}`;
           // Create the export directory if it doesn't exist
           await mkdir(baseDir, { recursive: true });
           alert(t('messages.mobileExportWarning', { dir: baseDir }));
@@ -966,7 +989,7 @@ export default function SceneListPage() {
         </div>
       </header>
 
-      <main>
+      <main className={settings.useTextureBackground ? 'textured' : ''}>
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -985,13 +1008,14 @@ export default function SceneListPage() {
                 chapterList={chapters}
                 onClick={startEditing}
                 onEdit={handleEditScene}
+                settings={settings}
               />
               ))}
             </div>
           </SortableContext>
           
           <DragOverlay>
-            {activeScene ? <SceneCardOverlay scene={activeScene} chapterList={chapters} /> : null}
+            {activeScene ? <SceneCardOverlay scene={activeScene} chapterList={chapters} settings={settings} /> : null}
           </DragOverlay>
         </DndContext>
       </main>
@@ -1374,8 +1398,14 @@ export default function SceneListPage() {
                 {chapters.map(chap => (
                   <li key={chap.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                     <input 
+                      type="color"
+                      value={chap.color || '#5468ff'}
+                      onChange={(e) => updateChapter(chap.id, { color: e.target.value })}
+                      style={{ width: '40px', height: '30px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                    />
+                    <input 
                       value={chap.title}
-                      onChange={(e) => updateChapter(chap.id, e.target.value)}
+                      onChange={(e) => updateChapter(chap.id, { title: e.target.value })}
                       onClick={(e) => e.stopPropagation()}
                       style={{ flex: 1 }}
                     />
@@ -1521,6 +1551,23 @@ export default function SceneListPage() {
                         {t('settings.autoSave.description')}
                       </small>
                     </div>
+
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ margin: 0 }}>{t('settings.textureBackground.label')}</label>
+                        <label className="toggle-switch">
+                          <input 
+                            type="checkbox" 
+                            checked={settings.useTextureBackground}
+                            onChange={(e) => setSettings({ ...settings, useTextureBackground: e.target.checked })}
+                          />
+                          <span className="slider round"></span>
+                        </label>
+                      </div>
+                      <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                        {t('settings.textureBackground.description')}
+                      </small>
+                    </div>
                   </div>
               )}
 
@@ -1620,16 +1667,18 @@ export default function SceneListPage() {
                     />
                   </div>
                   {settings.language !== 'en' && (
-                    <div className="form-group">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                        <input 
-                          type="checkbox"
-                          checked={settings.verticalWriting || false}
-                          onChange={(e) => setSettings({ ...settings, verticalWriting: e.target.checked })}
-                          style={{ width: 'auto', cursor: 'pointer' }}
-                        />
-                        <span>{t('settings.editor.verticalWriting')}</span>
-                      </label>
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ margin: 0 }}>{t('settings.editor.verticalWriting')}</label>
+                        <label className="toggle-switch">
+                          <input 
+                            type="checkbox"
+                            checked={settings.verticalWriting || false}
+                            onChange={(e) => setSettings({ ...settings, verticalWriting: e.target.checked })}
+                          />
+                          <span className="slider round"></span>
+                        </label>
+                      </div>
                       <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
                         {t('settings.editor.verticalWritingDesc')}
                       </small>

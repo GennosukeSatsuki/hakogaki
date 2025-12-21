@@ -8,7 +8,8 @@
     "edit": "Edit",
     "confirm": "Confirm",
     "warning": "Warning",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "completed": "Completed"
   },
   "menu": {
     "file": "File",
@@ -38,6 +39,7 @@
     "aim": "Aim & Role",
     "summary": "Summary",
     "note": "Note",
+    "completed": "Completed",
     "noSummary": "No summary",
     "placeholder": {
       "title": "Scene Title",
@@ -61,6 +63,10 @@
     "autoSave": {
       "label": "Auto Save",
       "description": "Automatically overwrite the file when modified (2s after typing stops)."
+    },
+    "textureBackground": {
+      "label": "Texture Background",
+      "description": "Apply a subtle paper texture to scene cards."
     },
     "timeInput": {
       "label": "Time Input Mode",

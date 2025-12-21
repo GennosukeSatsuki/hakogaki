@@ -4,6 +4,7 @@ import i18n from '../i18n/config';
 import TiptapEditor from '../components/TiptapEditor';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Scene, StoryData, AppSettings } from '../utils/exportUtils';
 
 export default function EditorPage() {
   const { t } = useTranslation();
@@ -16,8 +17,8 @@ export default function EditorPage() {
   const [fileExists, setFileExists] = useState(false);
   const [filePath, setFilePath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [scene, setScene] = useState<any>(null);
-  const [settings, setSettings] = useState<any>(null);
+  const [scene, setScene] = useState<Scene | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
     loadSceneFile();
@@ -127,6 +128,11 @@ export default function EditorPage() {
           data.dailyProgress.startingCounts[id!] = currentBodyCount;
         }
         
+        // 完了状態をチェック
+        const isComp = !fileContent.includes('──────────────');
+        const updatedScenes = data.scenes.map((s: Scene) => s.id === id ? { ...s, isCompleted: isComp } : s);
+        data.scenes = updatedScenes;
+        
         // localStorageを更新（SceneListPageと共有するため）
         localStorage.setItem('storyData', JSON.stringify(data));
       }
@@ -152,6 +158,15 @@ export default function EditorPage() {
       // 文字数をキャッシュ（総文字数計算用）
       const charCount = getBodyCharCount(content);
       localStorage.setItem(`sceneCharCount_${id}`, charCount.toString());
+
+      // プロジェクトデータの完了状態を更新
+      const storedData = localStorage.getItem('storyData');
+      if (storedData) {
+        const data = JSON.parse(storedData) as StoryData;
+        const isComp = !content.includes('──────────────');
+        data.scenes = data.scenes.map((s: Scene) => s.id === id ? { ...s, isCompleted: isComp } : s);
+        localStorage.setItem('storyData', JSON.stringify(data));
+      }
       
       alert(t('messages.saved'));
     } catch (e) {
@@ -218,8 +233,13 @@ export default function EditorPage() {
       const charCount = bodyText.length;
       localStorage.setItem(`sceneCharCount_${id}`, charCount.toString());
       
-      // 進捗管理: startCharCountは更新しない（進捗を維持）
-      // 箱書き部分が削除されても、今日書いた文字数はそのまま維持される
+      // プロジェクトデータの完了状態を更新
+      const storedData = localStorage.getItem('storyData');
+      if (storedData) {
+        const data = JSON.parse(storedData) as StoryData;
+        data.scenes = data.scenes.map((s: Scene) => s.id === id ? { ...s, isCompleted: true } : s);
+        localStorage.setItem('storyData', JSON.stringify(data));
+      }
       
       alert(t('messages.markedComplete'));
     } catch (e) {
@@ -432,12 +452,14 @@ export default function EditorPage() {
         </button>
       </div>
       
-      <TiptapEditor 
-        content={content} 
-        onChange={setContent} 
-        settings={settings}
-        placeholder={t('editor.placeholder')}
-      />
+      {settings && (
+        <TiptapEditor 
+          content={content} 
+          onChange={setContent} 
+          settings={settings}
+          placeholder={t('editor.placeholder')}
+        />
+      )}
       
       <div style={{ 
         marginTop: '20px',

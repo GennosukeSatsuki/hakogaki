@@ -21,6 +21,7 @@ export interface Scene {
   aim: string;
   summary: string;
   note: string;
+  isCompleted?: boolean;
   deploymentInfo?: DeploymentInfo;
 }
 
@@ -37,6 +38,7 @@ export interface Location {
 export interface Chapter {
   id: string;
   title: string;
+  color?: string;
   deploymentNumber?: number;
 }
 
@@ -49,6 +51,7 @@ export interface AppSettings {
   editorFontFamily?: string;
   editorFontSize?: number;
   verticalWriting?: boolean;
+  useTextureBackground?: boolean;
 }
 
 
@@ -305,21 +308,23 @@ ${separator}
         const existingContent = await readTextFile(filePath);
         
         // Find separator line (check for both old and new format)
-        const oldSeparator = '────────────────────────────────';
-        const newSeparatorPattern = /──────────────\(本文執筆完了後に消してください\)──────────────/;
+        // Heuristic: any line starting with 14 dashes is considered a separator
+        const separatorLine = '──────────────';
         
-        let separatorIndex = existingContent.search(newSeparatorPattern);
-        let foundSeparator = separator;
+        let separatorIndex = existingContent.indexOf(separatorLine);
         
         if (separatorIndex === -1) {
-          // Try old separator format
-          separatorIndex = existingContent.indexOf(oldSeparator);
-          if (separatorIndex !== -1) {
-            foundSeparator = oldSeparator;
-          }
-        }
-        
-        if (separatorIndex !== -1) {
+          // Separator not found - file is marked as complete
+          updatedScenes[i] = { ...updatedScenes[i], isCompleted: true };
+          shouldWrite = false; // Never overwrite completed files
+        } else {
+          updatedScenes[i] = { ...updatedScenes[i], isCompleted: false };
+          // Find the exact separator string used (until newline)
+          const endOfLine = existingContent.indexOf('\n', separatorIndex);
+          const foundSeparator = endOfLine !== -1 
+            ? existingContent.substring(separatorIndex, endOfLine).trim()
+            : existingContent.substring(separatorIndex).trim();
+          
           // Separator found - file is still in draft mode
           // Extract existing box-writing section (before separator)
           const existingBoxContent = existingContent.substring(0, separatorIndex + foundSeparator.length + 1);
@@ -328,7 +333,7 @@ ${separator}
           const bodyContent = existingContent.substring(separatorIndex).replace(new RegExp(`^${foundSeparator.replace(/[()]/g, '\\\\$&')}\\s*\\n+`), '');
           
           // Compare box-writing sections (normalize separator for comparison)
-          const normalizedExisting = existingBoxContent.replace(oldSeparator, separator).trim();
+          const normalizedExisting = existingBoxContent.replace(foundSeparator, separator).trim();
           const normalizedNew = boxContent.trim();
           
           if (normalizedExisting === normalizedNew) {
@@ -336,9 +341,6 @@ ${separator}
           } else {
             finalContent = boxContent + bodyContent;
           }
-        } else {
-          // No separator found - writing is complete, skip updating
-          shouldWrite = false;
         }
       } catch (e) {
         console.error(`Error reading existing file: ${fileName}`, e);
