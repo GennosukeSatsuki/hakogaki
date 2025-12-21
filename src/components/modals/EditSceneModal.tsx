@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Scene, Chapter, Location, Character, AppSettings } from '../../utils/exportUtils';
+import styles from './Modal.module.css';
 
 interface EditSceneModalProps {
   isOpen: boolean;
@@ -44,15 +45,15 @@ export function EditSceneModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
           <h2>{t('modals.editScene.title')}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
-        <div className="edit-form">
+        <div className={styles.editForm}>
           {/* Scene Title */}
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>{t('scene.title')}</label>
             <input
               value={editForm.title || ''}
@@ -60,9 +61,9 @@ export function EditSceneModal({
               placeholder={t('scene.placeholder.title')}
             />
           </div>
-          <div className="row-2-col">
+          <div className={styles.row2Col}>
             {/* Chapter selection */}
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>章タイトル</label>
               <select
                 value={editForm.chapterId || ''}
@@ -71,23 +72,15 @@ export function EditSceneModal({
                   const newTitle = chapters.find(c => c.id === newId)?.title || '';
                   onChange({ ...editForm, chapterId: newId, chapter: newTitle });
                 }}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  backgroundColor: 'var(--bg-input)',
-                  color: 'var(--text-main)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-sm)'
-                }}
               >
-                <option value="">-- 選択してください --</option>
+                <option value="">-- {t('common.select')} --</option>
                 {chapters.map(c => (
                   <option key={c.id} value={c.id}>{c.title}</option>
                 ))}
               </select>
             </div>
             {/* Time input */}
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>時間</label>
               {settings.timeInputMode === 'datetime' ? (
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch' }}>
@@ -252,7 +245,7 @@ export function EditSceneModal({
               )}
             </div>
             {/* Place input */}
-            <div className="form-group">
+            <div className={styles.formGroup}>
               <label>{t('scene.place')}</label>
               {settings.placeInputMode === 'select' ? (
                 <select
@@ -273,23 +266,23 @@ export function EditSceneModal({
             </div>
           </div>
           {/* Characters */}
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>{t('scene.characters')} <small style={{color: 'var(--text-secondary)'}}>(選択中: {editForm.characterIds?.length || 0})</small></label>
-            <div className="character-tags">
+            <div className={styles.characterTags}>
               {characters.map(char => (
                 <button
                   key={char.id}
-                  className={`character-tag ${editForm.characterIds?.includes(char.id) ? 'active' : ''}`}
+                  className={`${styles.characterTag} ${editForm.characterIds?.includes(char.id) ? styles.active : ''}`}
                   onClick={() => toggleCharacterInScene(char.id)}
                 >
                   {char.name}
                 </button>
               ))}
-              <button className="add-tag-btn" onClick={onOpenCharacterMenu}>+</button>
+              <button className={styles.addTagBtn} onClick={onOpenCharacterMenu}>+</button>
             </div>
           </div>
           {/* Aim */}
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>{t('scene.aim')}</label>
             <textarea
               value={editForm.aim}
@@ -298,7 +291,7 @@ export function EditSceneModal({
             />
           </div>
           {/* Summary */}
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>{t('scene.summary')}</label>
             <textarea
               value={editForm.summary}
@@ -308,21 +301,22 @@ export function EditSceneModal({
             />
           </div>
           {/* Note */}
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>{t('scene.note')}</label>
             <textarea
               value={editForm.note}
               onChange={e => handleInputChange('note', e.target.value)}
               rows={3}
               className="note-input"
+              style={{ fontFamily: 'monospace', opacity: 0.9 }}
               placeholder={t('scene.placeholder.note')}
             />
           </div>
           {/* Actions */}
-          <div className="modal-actions">
+          <div className={styles.modalActions}>
             <button className="delete-btn" onClick={() => onDelete(editingId!)}>{t('common.delete')}</button>
-            <div className="right-actions">
-              <button onClick={() => onSave(false)}>{t('common.save')}</button>
+            <div className={styles.rightActions}>
+              <button className="secondary" onClick={() => onSave(false)}>{t('common.save')}</button>
               <button className="primary" onClick={() => onSave(true)}>{t('common.close')}</button>
             </div>
           </div>

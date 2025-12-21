@@ -1,0 +1,138 @@
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  padding: 1rem 1.5rem;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.headerTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-main);
+  margin-left: 1rem;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+}
+
+.menuContainer {
+  position: relative;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 150px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdownItem {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  color: var(--text-main);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.dropdownItem:hover {
+  background-color: var(--bg-hover);
+}
+
+.dropdownItem:first-child {
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+}
+
+.dropdownItem:last-child {
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.5rem;
+  min-height: 0;
+}
+
+.main.textured {
+  background-image: var(--bg-texture);
+  background-repeat: repeat;
+  background-size: 400px;
+}
+
+.sceneGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) and (orientation: portrait) {
+  .header {
+    padding: 0.5rem 1rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 56px;
+  }
+
+  .headerTitle {
+    font-size: 0.95rem;
+    margin-left: 0;
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .main {
+    padding: 1rem;
+  }
+
+  .sceneGrid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}

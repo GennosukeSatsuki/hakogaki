@@ -8,7 +8,7 @@ import { ask } from '@tauri-apps/plugin-dialog';
 
 import { getVersion } from '@tauri-apps/api/app';
 
-import '../App.css';
+import styles from './SceneListPage.module.css';
 
 
 
@@ -199,9 +199,9 @@ export default function SceneListPage() {
   }, [handleOverwriteSave]); // Re-bind when save handler changes (which depends on state)
 
   return (
-    <div className="container">
-      <header>
-        <div className="menu-container">
+    <div className={styles.container}>
+      <header className={styles.header}>
+        <div className={styles.menuContainer}>
           <button 
             className="secondary" 
             onClick={() => setIsFileMenuOpen(!isFileMenuOpen)}
@@ -215,31 +215,31 @@ export default function SceneListPage() {
             {t('menu.file')} ▼
           </button>
           {isFileMenuOpen && (
-            <div className="dropdown-menu">
-              <button className="dropdown-item" onClick={handleNewProject}>
+            <div className={styles.dropdownMenu}>
+              <button className={styles.dropdownItem} onClick={handleNewProject}>
                 {t('menu.newProject')}
               </button>
               <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
-              <button className="dropdown-item" onClick={() => handleOverwriteSave(false)}>
+              <button className={styles.dropdownItem} onClick={() => handleOverwriteSave(false)}>
                 {t('menu.saveProject')}
               </button>
-              <button className="dropdown-item" onClick={handleSaveAs}>
+              <button className={styles.dropdownItem} onClick={handleSaveAs}>
                 {t('menu.saveAs')}
               </button>
-              <button className="dropdown-item" onClick={handleLoadFile}>
+              <button className={styles.dropdownItem} onClick={handleLoadFile}>
                 {t('menu.openProject')}
               </button>
               <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
-              <button className="dropdown-item" onClick={handleDeploy}>
+              <button className={styles.dropdownItem} onClick={handleDeploy}>
                 {t('menu.export')}
               </button>
               <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
-              <button className="dropdown-item" onClick={() => { setIsFileMenuOpen(false); setIsSettingsOpen(true); }}>
+              <button className={styles.dropdownItem} onClick={() => { setIsFileMenuOpen(false); setIsSettingsOpen(true); }}>
                 {t('menu.settings')}
               </button>
 
               <div style={{ height: 1, backgroundColor: 'var(--border-subtle)', margin: '0.25rem 0' }} />
-              <button className="dropdown-item" onClick={() => { setIsFileMenuOpen(false); setIsAboutOpen(true); }}>
+              <button className={styles.dropdownItem} onClick={() => { setIsFileMenuOpen(false); setIsAboutOpen(true); }}>
                 {t('menu.about')}
               </button>
             </div>
@@ -254,8 +254,8 @@ export default function SceneListPage() {
           )}
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>HakoGraph</h1>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.headerTitle}>HakoGraph</h1>
           <button 
             className="secondary-btn" 
             onClick={() => setIsAboutOpen(true)}
@@ -275,7 +275,7 @@ export default function SceneListPage() {
           </button>
         </div>
 
-        <div className="actions">
+        <div className={styles.actions}>
           <button 
             className="secondary" 
             onClick={() => setIsCharacterMenuOpen(true)}
@@ -305,7 +305,7 @@ export default function SceneListPage() {
         </div>
       </header>
 
-      <main className={settings.useTextureBackground ? 'textured' : ''}>
+      <main className={`${styles.main} ${settings.useTextureBackground ? styles.textured : ''}`}>
         <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -316,7 +316,7 @@ export default function SceneListPage() {
             items={scenes.map(s => s.id)}
             strategy={rectSortingStrategy}
           >
-            <div className="scene-grid">
+            <div className={styles.sceneGrid}>
               {scenes.map(scene => (
               <SortableSceneCard 
                 key={scene.id} 

@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Scene } from '../utils/exportUtils';
 import { useStoryStore } from '../stores/useStoryStore';
+import styles from './EditorPage.module.css';
 
 export default function EditorPage() {
   const { t } = useTranslation();
@@ -260,35 +261,35 @@ export default function EditorPage() {
     navigate('/');
   };
 
-  if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
+  if (loading) return <div className={styles.loadingScreen}>{t('common.loading')}</div>;
 
   if (error) {
     return (
-      <div className="error-screen">
-        <div className="error-message">{error}</div>
-        <button className="secondary-btn" onClick={handleBackToList}>{t('messages.backToList')}</button>
+      <div className={styles.errorScreen}>
+        <div className={styles.errorMessage}>{error}</div>
+        <button className="secondary" onClick={handleBackToList}>{t('messages.backToList')}</button>
       </div>
     );
   }
 
   if (!fileExists) {
     return (
-      <div className="export-needed-screen">
+      <div className={styles.exportNeededScreen}>
         <h2>📝 {t('messages.exportNeeded')}</h2>
         <p>{t('messages.exportNeededDesc').split('\n').map((l, i) => <span key={i}>{l}<br /></span>)}</p>
-        <button className="primary-btn" onClick={handleBackToList}>{t('messages.backToList')}</button>
+        <button className="primary" onClick={handleBackToList}>{t('messages.backToList')}</button>
       </div>
     );
   }
 
   return (
-    <div className="editor-page-container">
-      <header className="editor-header">
+    <div className={styles.editorPageContainer}>
+      <header className={styles.editorHeader}>
         <h1>{t('scene.sceneNo', { no: currentScene?.sceneNo })} {currentScene?.title || t('scene.noTitle')}</h1>
-        <button className="secondary-btn" onClick={handleBackToList}>{t('messages.backToList')}</button>
+        <button className="secondary" onClick={handleBackToList}>{t('messages.backToList')}</button>
       </header>
       
-      <main className="editor-main">
+      <main className={styles.editorMain}>
         <TiptapEditor 
           content={content} 
           onChange={setContent} 
@@ -297,21 +298,21 @@ export default function EditorPage() {
         />
       </main>
       
-      <footer className="editor-footer">
-        <div className="stats-container">
-          <div className="total-stats">
+      <footer className={styles.editorFooter}>
+        <div className={styles.statsContainer}>
+          <div className={styles.totalStats}>
             {t('editor.totalChars')}: <strong>{totalChars.toLocaleString()}</strong>{t('editor.charUnit')}
           </div>
-          <div className="scene-stats">
+          <div className={styles.sceneStats}>
             {t('editor.thisScene')}: {getBodyCharCount(content).toLocaleString()}{t('editor.charUnit')}
-            <span className="daily-progress">
+            <span className={styles.dailyProgress}>
               （{t('editor.todayProgress')}: {totalTodayProgress >= 0 ? '+' : ''}{totalTodayProgress.toLocaleString()}{t('editor.charUnit')}）
             </span>
           </div>
         </div>
-        <div className="editor-actions">
-          <button className="complete-btn" onClick={handleMarkComplete}>✓ {t('messages.writingComplete')}</button>
-          <button className="save-btn" onClick={handleSave}>{t('common.save')}</button>
+        <div className={styles.editorActions}>
+          <button className={styles.completeBtn} onClick={handleMarkComplete}>✓ {t('messages.writingComplete')}</button>
+          <button className={styles.saveBtn} onClick={handleSave}>{t('common.save')}</button>
         </div>
       </footer>
     </div>

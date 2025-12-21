@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Character, Location, Chapter } from '../../utils/exportUtils';
+import styles from './Modal.module.css';
 
 interface CharacterManagementModalProps {
   isOpen: boolean;
@@ -27,16 +28,16 @@ export function CharacterManagementModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
           <h2>{t('modals.character.title')}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
-        <div className="edit-form">
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '400px', overflowY: 'auto' }}>
+        <div className={styles.editForm}>
+          <ul className={styles.modalList}>
             {characters.map(char => (
-              <li key={char.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
+              <li key={char.id} className={styles.modalListItem}>
                 <input 
                   value={char.name}
                   onChange={(e) => onUpdate(char.id, e.target.value)}
@@ -47,7 +48,7 @@ export function CharacterManagementModal({
                   type="button" 
                   className="delete-btn" 
                   onClick={() => onDelete(char.id)} 
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
                 >
                   {t('common.delete')}
                 </button>
@@ -98,16 +99,16 @@ export function LocationManagementModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
           <h2>{t('modals.location.title')}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
-        <div className="edit-form">
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: '400px', overflowY: 'auto' }}>
+        <div className={styles.editForm}>
+          <ul className={styles.modalList}>
             {locations.map(loc => (
-              <li key={loc.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
+              <li key={loc.id} className={styles.modalListItem}>
                 <input 
                   value={loc.name}
                   onChange={(e) => onUpdate(loc.id, e.target.value)}
@@ -118,7 +119,7 @@ export function LocationManagementModal({
                   type="button" 
                   className="delete-btn" 
                   onClick={() => onDelete(loc.id)} 
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
                 >
                   {t('common.delete')}
                 </button>
@@ -169,16 +170,16 @@ export function ChapterManagementModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalContent} style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
           <h2>{t('modals.chapter.title')}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
-        <div className="edit-form">
-          <ul style={{ listStyle: 'none', padding: 0 }}>
+        <div className={styles.editForm}>
+          <ul className={styles.modalList}>
             {chapters.map(chap => (
-              <li key={chap.id} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+              <li key={chap.id} className={styles.modalListItem}>
                 <input 
                   type="color"
                   value={chap.color || '#5468ff'}
@@ -195,7 +196,7 @@ export function ChapterManagementModal({
                   type="button" 
                   className="delete-btn" 
                   onClick={() => onDelete(chap.id)} 
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
                 >
                   {t('common.delete')}
                 </button>
