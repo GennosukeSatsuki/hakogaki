@@ -101,7 +101,8 @@ jobs:
 
       - name: Build Android APK
         run: |
-          npm run tauri android init || true
+          rm -rf src-tauri/gen/android
+          npm run tauri android init
           npm run tauri android build -- --debug
 
       - name: Upload Android APK to Release
