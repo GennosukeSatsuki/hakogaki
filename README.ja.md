@@ -44,6 +44,16 @@ Excelで箱書きを作っても、シーンごとのファイルにするのは
 - 実験的に搭載してみました。
 - Chromium系で縦書きは鬼門なのでまだおまけ程度です。
 
+## 技術スタック
+
+このプロジェクトは以下の技術で構築されています：
+
+- **フレームワーク**: [Tauri](https://tauri.app/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/)
+- **ビルドツール**: [Vite](https://vitejs.dev/)
+- **状態管理**: [Zustand](https://github.com/pmndrs/zustand)
+- **UI/ドラッグ＆ドロップ**: [dnd-kit](https://dndkit.com/)
+- **多言語対応**: [i18next](https://www.i18next.com/)
+
 ## 必要環境
 
 - **インストーラーをダウンロードする場合**:

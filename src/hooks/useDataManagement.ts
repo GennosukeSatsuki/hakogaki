@@ -1,76 +1,47 @@
-import { useState, useCallback } from 'react';
-import type { Character, Location, Chapter, Scene } from '../utils/exportUtils';
+import { useState } from 'react';
+import { useStoryStore } from '../stores/useStoryStore';
 
-interface UseDataManagementProps {
-  setScenes: React.Dispatch<React.SetStateAction<Scene[]>>;
-}
+export function useDataManagement() {
+  // Store Selectors
+  const characters = useStoryStore(state => state.characters);
+  const setCharacters = useStoryStore(state => state.setCharacters);
+  const locations = useStoryStore(state => state.locations);
+  const setLocations = useStoryStore(state => state.setLocations);
+  const chapters = useStoryStore(state => state.chapters);
+  const setChapters = useStoryStore(state => state.setChapters);
+  
+  const addCharacterFromStore = useStoryStore(state => state.addCharacter);
+  const updateCharacter = useStoryStore(state => state.updateCharacter);
+  const deleteCharacter = useStoryStore(state => state.deleteCharacter);
+  
+  const addLocationFromStore = useStoryStore(state => state.addLocation);
+  const updateLocation = useStoryStore(state => state.updateLocation);
+  const deleteLocation = useStoryStore(state => state.deleteLocation);
+  
+  const addChapterFromStore = useStoryStore(state => state.addChapter);
+  const updateChapter = useStoryStore(state => state.updateChapter);
+  const deleteChapter = useStoryStore(state => state.deleteChapter);
 
-export function useDataManagement({ setScenes }: UseDataManagementProps) {
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  // Local UI State
   const [newCharacterName, setNewCharacterName] = useState('');
   const [newLocationName, setNewLocationName] = useState('');
   const [newChapterTitle, setNewChapterTitle] = useState('');
 
-  // Character Management
-  const addCharacter = useCallback(async () => {
-    if (newCharacterName && newCharacterName.trim()) {
-      setCharacters(prev => [...prev, { id: crypto.randomUUID(), name: newCharacterName.trim() }]);
-      setNewCharacterName('');
-    }
-  }, [newCharacterName]);
+  // Wrappers
+  const addCharacter = () => {
+    addCharacterFromStore(newCharacterName);
+    setNewCharacterName('');
+  };
 
-  const updateCharacter = useCallback((id: string, newName: string) => {
-    setCharacters(prev => prev.map(c => c.id === id ? { ...c, name: newName } : c));
-    setScenes(prev => prev.map(s => ({
-      ...s,
-      characters: s.characterIds?.map(cid => {
-        const char = characters.find(c => c.id === cid);
-        return char?.id === id ? newName : char?.name;
-      }).filter(Boolean).join(', ') || s.characters
-    })));
-  }, [characters, setScenes]);
+  const addLocation = () => {
+    addLocationFromStore(newLocationName);
+    setNewLocationName('');
+  };
 
-  const deleteCharacter = useCallback((id: string) => {
-    setCharacters(prev => prev.filter(c => c.id !== id));
-    setScenes(prev => prev.map(s => ({
-      ...s,
-      characterIds: s.characterIds?.filter(cid => cid !== id)
-    })));
-  }, [setScenes]);
-
-  // Location Management
-  const addLocation = useCallback(() => {
-    if (newLocationName && newLocationName.trim()) {
-      setLocations(prev => [...prev, { id: crypto.randomUUID(), name: newLocationName.trim() }]);
-      setNewLocationName('');
-    }
-  }, [newLocationName]);
-
-  const updateLocation = useCallback((id: string, newName: string) => {
-    setLocations(prev => prev.map(l => l.id === id ? { ...l, name: newName } : l));
-  }, []);
-
-  const deleteLocation = useCallback((id: string) => {
-    setLocations(prev => prev.filter(l => l.id !== id));
-  }, []);
-
-  // Chapter Management
-  const addChapter = useCallback(() => {
-    if (newChapterTitle && newChapterTitle.trim()) {
-      setChapters(prev => [...prev, { id: crypto.randomUUID(), title: newChapterTitle.trim() }]);
-      setNewChapterTitle('');
-    }
-  }, [newChapterTitle]);
-
-  const updateChapter = useCallback((id: string, updates: Partial<Chapter>) => {
-    setChapters(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  }, []);
-
-  const deleteChapter = useCallback((id: string) => {
-    setChapters(prev => prev.filter(c => c.id !== id));
-  }, []);
+  const addChapter = () => {
+    addChapterFromStore(newChapterTitle);
+    setNewChapterTitle('');
+  };
 
   return {
     // Characters

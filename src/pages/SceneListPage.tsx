@@ -10,12 +10,6 @@ import { getVersion } from '@tauri-apps/api/app';
 
 import '../App.css';
 
-import { 
-  Scene, 
-  AppSettings, 
-  DailyProgress
-} from '../utils/exportUtils';
-
 
 
 import { SortableSceneCard, SceneCardOverlay } from '../components/SceneCard';
@@ -33,52 +27,51 @@ import { useDataManagement } from '../hooks/useDataManagement';
 import { useDragAndDrop } from '../hooks/useDragAndDrop';
 import { useTimeInput } from '../hooks/useTimeInput';
 import { useFileManagement } from '../hooks/useFileManagement';
+import { useStoryStore } from '../stores/useStoryStore';
 
 export default function SceneListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [initialized, setInitialized] = useState(false);
-  const [scenes, setScenes] = useState<Scene[]>([]);
-  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
-  const [lastDeployPath, setLastDeployPath] = useState<string | null>(null);
-  const [nextSceneNo, setNextSceneNo] = useState(1);
+  // Store States
+  const scenes = useStoryStore(state => state.scenes);
+  const setScenes = useStoryStore(state => state.setScenes);
+  const nextSceneNo = useStoryStore(state => state.nextSceneNo);
+  const setNextSceneNo = useStoryStore(state => state.setNextSceneNo);
+  const settings = useStoryStore(state => state.settings);
+  const setSettings = useStoryStore(state => state.setSettings);
 
+  // UI States
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
   const [isChapterMenuOpen, setIsChapterMenuOpen] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({ language: 'ja', timeInputMode: 'text', placeInputMode: 'text', autoSave: false, theme: 'system', editorFontFamily: 'sans-serif', editorFontSize: 16, verticalWriting: false });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'outline' | 'editor'>('general');
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
-  const [dailyProgress, setDailyProgress] = useState<DailyProgress | null>(null);
   
   // Data Management Hook
   const {
     characters,
-    setCharacters,
     newCharacterName,
     setNewCharacterName,
     addCharacter,
     updateCharacter,
     deleteCharacter,
     locations,
-    setLocations,
     newLocationName,
     setNewLocationName,
     addLocation,
     updateLocation,
     deleteLocation,
     chapters,
-    setChapters,
     newChapterTitle,
     setNewChapterTitle,
     addChapter,
     updateChapter,
     deleteChapter,
-  } = useDataManagement({ setScenes });
+  } = useDataManagement();
 
   // Scene Management Hook
   const sceneManagement = useSceneManagement({
@@ -124,26 +117,6 @@ export default function SceneListPage() {
     handleLoadFile,
     handleDeploy,
   } = useFileManagement({
-    scenes,
-    setScenes,
-    characters,
-    setCharacters,
-    locations,
-    setLocations,
-    chapters,
-    setChapters,
-    settings,
-    setSettings,
-    nextSceneNo,
-    setNextSceneNo,
-    dailyProgress,
-    setDailyProgress,
-    currentFilePath,
-    setCurrentFilePath,
-    lastDeployPath,
-    setLastDeployPath,
-    initialized,
-    setInitialized,
     setIsFileMenuOpen,
   });
 

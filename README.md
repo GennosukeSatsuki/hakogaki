@@ -44,6 +44,16 @@ The content of the text files looks like this:
 - Basic vertical layout support for Japanese novels.
 - Still experimental as vertical text can be tricky in Chromium-based environments.
 
+## Tech Stack
+
+This project is built with the following technologies:
+
+- **Framework**: [Tauri](https://tauri.app/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
+- **UI/Drag & Drop**: [dnd-kit](https://dndkit.com/)
+- **i18n**: [i18next](https://www.i18next.com/)
+
 ## Requirements
 
 - **Downloading the Installer**:
