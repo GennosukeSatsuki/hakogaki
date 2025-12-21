@@ -1,14 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { AppSettings } from '../../utils/exportUtils';
+import { AVAILABLE_PLUGINS } from '../../plugins/registry';
 
 interface SettingsModalProps {
   isOpen: boolean;
   settings: AppSettings;
   systemFonts: string[];
-  activeTab: 'general' | 'outline' | 'editor';
+  activeTab: 'general' | 'outline' | 'editor' | 'plugins';
   onClose: () => void;
   onSettingsChange: (settings: AppSettings) => void;
-  onTabChange: (tab: 'general' | 'outline' | 'editor') => void;
+  onTabChange: (tab: 'general' | 'outline' | 'editor' | 'plugins') => void;
 }
 
 export function SettingsModal({
@@ -20,9 +21,33 @@ export function SettingsModal({
   onSettingsChange,
   onTabChange,
 }: SettingsModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language as 'ja' | 'en';
 
   if (!isOpen) return null;
+
+  const isPluginEnabled = (pluginId: string) => {
+    return settings.enabledPlugins?.includes(pluginId) ?? false;
+  };
+
+  const togglePlugin = (pluginId: string) => {
+    const currentPlugins = settings.enabledPlugins || [];
+    let newPlugins: string[];
+    
+    if (currentPlugins.includes(pluginId)) {
+      newPlugins = currentPlugins.filter(id => id !== pluginId);
+    } else {
+      newPlugins = [...currentPlugins, pluginId];
+    }
+    
+    onSettingsChange({ 
+      ...settings, 
+      enabledPlugins: newPlugins,
+      // プラグイン無効化時に設定本体もOFFにする処理
+      ...(pluginId === 'vertical-writing' && !newPlugins.includes(pluginId) ? { verticalWriting: false } : {}),
+      ...(pluginId === 'texture-background' && !newPlugins.includes(pluginId) ? { useTextureBackground: false } : {})
+    });
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -31,54 +56,33 @@ export function SettingsModal({
           <h2>{t('modals.settings.title')}</h2>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 1.5rem' }}>
-          <button
-            style={{
-              padding: '0.75rem 1rem',
-              border: 'none',
-              borderBottom: activeTab === 'general' ? '2px solid var(--primary)' : '2px solid transparent',
-              background: 'none',
-              color: activeTab === 'general' ? 'var(--primary)' : 'var(--text-secondary)',
-              fontWeight: activeTab === 'general' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              marginRight: '1rem'
-            }}
-            onClick={() => onTabChange('general')}
-          >
-            {t('settings.tabs.general')}
-          </button>
-          <button
-            style={{
-              padding: '0.75rem 1rem',
-              border: 'none',
-              borderBottom: activeTab === 'outline' ? '2px solid var(--primary)' : '2px solid transparent',
-              background: 'none',
-              color: activeTab === 'outline' ? 'var(--primary)' : 'var(--text-secondary)',
-              fontWeight: activeTab === 'outline' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              marginRight: '1rem'
-            }}
-            onClick={() => onTabChange('outline')}
-          >
-            {t('settings.tabs.outline')}
-          </button>
-          <button
-            style={{
-              padding: '0.75rem 1rem',
-              border: 'none',
-              borderBottom: activeTab === 'editor' ? '2px solid var(--primary)' : '2px solid transparent',
-              background: 'none',
-              color: activeTab === 'editor' ? 'var(--primary)' : 'var(--text-secondary)',
-              fontWeight: activeTab === 'editor' ? 'bold' : 'normal',
-              cursor: 'pointer'
-            }}
-            onClick={() => onTabChange('editor')}
-          >
-            {t('settings.tabs.editor')}
-          </button>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 1.5rem', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+          {[
+            { id: 'general', label: t('settings.tabs.general') },
+            { id: 'outline', label: t('settings.tabs.outline') },
+            { id: 'editor', label: t('settings.tabs.editor') },
+            { id: 'plugins', label: t('settings.tabs.plugins') }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              style={{
+                padding: '0.75rem 1rem',
+                border: 'none',
+                borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
+                background: 'none',
+                color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
+                fontWeight: activeTab === tab.id ? 'bold' : 'normal',
+                cursor: 'pointer',
+                marginRight: '1rem'
+              }}
+              onClick={() => onTabChange(tab.id as any)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div className="edit-form" style={{ padding: '1.5rem' }}>
+        <div className="edit-form" style={{ padding: '1.5rem', maxHeight: '60vh', overflowY: 'auto' }}>
           {activeTab === 'general' && (
             <div className="settings-section">
               <div className="form-group">
@@ -144,22 +148,24 @@ export function SettingsModal({
                 </small>
               </div>
 
-              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ margin: 0 }}>{t('settings.textureBackground.label')}</label>
-                  <label className="toggle-switch">
-                    <input 
-                      type="checkbox" 
-                      checked={settings.useTextureBackground}
-                      onChange={(e) => onSettingsChange({ ...settings, useTextureBackground: e.target.checked })}
-                    />
-                    <span className="slider round"></span>
-                  </label>
+              {isPluginEnabled('texture-background') && (
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ margin: 0 }}>{t('settings.textureBackground.label')}</label>
+                    <label className="toggle-switch">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.useTextureBackground}
+                        onChange={(e) => onSettingsChange({ ...settings, useTextureBackground: e.target.checked })}
+                      />
+                      <span className="slider round"></span>
+                    </label>
+                  </div>
+                  <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
+                    {t('settings.textureBackground.description')}
+                  </small>
                 </div>
-                <small style={{ color: 'var(--text-muted)', marginTop: '0.5rem', display: 'block' }}>
-                  {t('settings.textureBackground.description')}
-                </small>
-              </div>
+              )}
             </div>
           )}
 
@@ -228,7 +234,9 @@ export function SettingsModal({
                 >
                   <option value="sans-serif">{t('settings.editor.gothic')}</option>
                   <option value="serif">{t('settings.editor.mincho')}</option>
-                  <option value='"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "MS PMincho", "MS Mincho", serif'>游明朝 ({t('settings.editor.verticalWriting')})</option>
+                  {isPluginEnabled('vertical-writing') && (
+                    <option value='"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "MS PMincho", "MS Mincho", serif'>游明朝 ({t('settings.editor.verticalWriting')})</option>
+                  )}
                   <option value="monospace">{t('settings.editor.monospace')}</option>
                   {systemFonts.length > 0 && (
                     <>
@@ -258,7 +266,7 @@ export function SettingsModal({
                   }}
                 />
               </div>
-              {settings.language !== 'en' && (
+              {isPluginEnabled('vertical-writing') && settings.language !== 'en' && (
                 <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ margin: 0 }}>{t('settings.editor.verticalWriting')}</label>
@@ -277,6 +285,42 @@ export function SettingsModal({
                 </div>
               )}
             </>
+          )}
+
+          {activeTab === 'plugins' && (
+            <div className="plugins-section">
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                {settings.language === 'ja' ? '特定の地域や用途向けの機能を有効化できます。' : 'Enable features for specific regions or use cases.'}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {AVAILABLE_PLUGINS.map(plugin => (
+                  <div key={plugin.id} style={{ 
+                    padding: '1rem', 
+                    borderRadius: 'var(--radius-md)', 
+                    backgroundColor: 'var(--bg-card)', 
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem' }}>{plugin.name[currentLang] || plugin.name['en']}</h3>
+                      <label className="toggle-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={isPluginEnabled(plugin.id)}
+                          onChange={() => togglePlugin(plugin.id)}
+                        />
+                        <span className="slider round"></span>
+                      </label>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      {plugin.description[currentLang] || plugin.description['en']}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
         <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>

@@ -51,7 +51,8 @@
     "tabs": {
       "general": "全般",
       "outline": "構成",
-      "editor": "エディタ"
+      "editor": "エディタ",
+      "plugins": "拡張機能"
     },
     "language": "言語",
     "theme": {

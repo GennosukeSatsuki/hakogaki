@@ -48,7 +48,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system', 
   editorFontFamily: 'sans-serif', 
   editorFontSize: 16, 
-  verticalWriting: false 
+  verticalWriting: false,
+  enabledPlugins: ['vertical-writing', 'texture-background'] 
 };
 
 export const useStoryStore = create<StoryState>()(

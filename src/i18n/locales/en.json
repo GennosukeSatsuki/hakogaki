@@ -51,7 +51,8 @@
     "tabs": {
       "general": "General",
       "outline": "Outline",
-      "editor": "Editor"
+      "editor": "Editor",
+      "plugins": "Plugins"
     },
     "language": "Language",
     "theme": {

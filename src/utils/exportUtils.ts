@@ -52,6 +52,7 @@ export interface AppSettings {
   editorFontSize?: number;
   verticalWriting?: boolean;
   useTextureBackground?: boolean;
+  enabledPlugins?: string[];
 }
 
 

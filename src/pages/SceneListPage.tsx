@@ -45,7 +45,7 @@ export default function SceneListPage() {
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
   const [isChapterMenuOpen, setIsChapterMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'outline' | 'editor'>('general');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'outline' | 'editor' | 'plugins'>('general');
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [appVersion, setAppVersion] = useState('');
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
