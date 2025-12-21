@@ -50,7 +50,7 @@ import { SettingsModal, AboutModal } from '../components/modals/SettingsModal';
 import { EditSceneModal } from '../components/modals/EditSceneModal';
 
 // Custom Hooks (to be integrated)
-// import { useSceneManagement } from '../hooks/useSceneManagement';
+import { useSceneManagement } from '../hooks/useSceneManagement';
 import { useDataManagement } from '../hooks/useDataManagement';
 // import { useDragAndDrop } from '../hooks/useDragAndDrop';
 // import { useTimeInput } from '../hooks/useTimeInput';
@@ -80,8 +80,6 @@ export default function SceneListPage() {
   const [lastDeployPath, setLastDeployPath] = useState<string | null>(null);
   const [nextSceneNo, setNextSceneNo] = useState(1);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Scene>>({});
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
   const [isChapterMenuOpen, setIsChapterMenuOpen] = useState(false);
@@ -119,6 +117,28 @@ export default function SceneListPage() {
     updateChapter,
     deleteChapter,
   } = useDataManagement({ setScenes });
+
+  // Scene Management Hook
+  const sceneManagement = useSceneManagement({
+    scenes,
+    setScenes,
+    characters,
+    chapters,
+    nextSceneNo,
+    setNextSceneNo,
+    settings,
+  });
+
+  const {
+    editingId,
+    editForm,
+    setEditForm,
+    startEditing,
+    saveScene,
+    deleteScene: deleteSceneFromHook,
+    handleInputChange,
+    toggleCharacterInScene,
+  } = sceneManagement;
   
   // For long-press time picker
   const longPressTimer = useRef<number | null>(null);
@@ -163,90 +183,15 @@ export default function SceneListPage() {
     navigate(`/editor/${sceneId}`);
   };
 
+  // Wrapper for addScene from hook
   const handleAddScene = () => {
-    const newScene: Scene = {
-      id: crypto.randomUUID(),
-      sceneNo: nextSceneNo,
-      title: '',
-      chapter: '',
-      characters: '',
-      time: '',
-      place: '',
-      aim: '',
-      summary: '',
-      note: '',
-    };
-    setScenes([...scenes, newScene]);
-    setNextSceneNo(nextSceneNo + 1); // 次のシーン番号をインクリメント
-    startEditing(newScene);
+    sceneManagement.addScene(startEditing);
   };
 
-  const startEditing = (scene: Scene) => {
-    setEditingId(scene.id);
-    let editableScene = { ...scene };
-    
-    // If in datetime mode and time is not in ISO format, try to convert or set to current time
-    if (settings.timeInputMode === 'datetime' && editableScene.time) {
-      // Check if already in ISO format (contains 'T')
-      if (!editableScene.time.includes('T')) {
-        // Not in ISO format, set to current time as default
-        const now = new Date();
-        editableScene.time = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
-        editableScene.timeMode = 'datetime';
-      }
-    }
-    
-    setEditForm(editableScene);
-  };
-
-  const saveScene = (shouldClose: boolean = true) => {
-    if (!editForm || !editForm.id) return;
-    setScenes(prev => prev.map(s => s.id === editForm.id ? { ...s, ...editForm } : s));
-    if (shouldClose) {
-      setEditingId(null);
-      setEditForm({});
-    }
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-  };
-
+  // Wrapper for deleteScene with confirmation
   const deleteScene = async (id: string) => {
-  const confirmed = await ask(t('messages.deleteConfirm'), { title: t('common.confirm'), kind: 'warning' });
-  if (confirmed) {
-    setScenes(scenes.filter(s => s.id !== id));
-    if (editingId === id) cancelEdit();
-  }
-};
-
-  const handleInputChange = (field: keyof Scene, value: any) => {
-    setEditForm(prev => {
-      if (!prev.id) return prev;
-      return { ...prev, [field]: value };
-    });
-  };
-
-  const toggleCharacterInScene = (charId: string) => {
-    setEditForm(prev => {
-      if (!prev.id) return prev;
-      const currentIds = prev.characterIds || [];
-      let newIds;
-      if (currentIds.includes(charId)) {
-        newIds = currentIds.filter(id => id !== charId);
-      } else {
-        newIds = [...currentIds, charId];
-      }
-      
-      // Also update legacy string for display
-      const newString = newIds.map(id => characters.find(c => c.id === id)?.name).filter(Boolean).join(', ');
-      
-      return {
-        ...prev,
-        characterIds: newIds,
-        characters: newString
-      };
+    await deleteSceneFromHook(id, async () => {
+      return await ask(t('messages.deleteConfirm'), { title: t('common.confirm'), kind: 'warning' });
     });
   };
 

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Scene, Chapter, Character } from '../utils/exportUtils';
+import type { Scene, Chapter, Character, AppSettings } from '../utils/exportUtils';
 
 interface UseSceneManagementProps {
   scenes: Scene[];
@@ -8,6 +8,7 @@ interface UseSceneManagementProps {
   chapters: Chapter[];
   nextSceneNo: number;
   setNextSceneNo: React.Dispatch<React.SetStateAction<number>>;
+  settings: AppSettings;
 }
 
 export function useSceneManagement({
@@ -17,18 +18,28 @@ export function useSceneManagement({
   chapters,
   nextSceneNo,
   setNextSceneNo,
+  settings,
 }: UseSceneManagementProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Scene>>({});
 
-  const startEditing = useCallback((sceneId: string) => {
-    const scene = scenes.find(s => s.id === sceneId);
-    if (scene) {
-      setEditingId(sceneId);
-      const editableScene = { ...scene };
-      setEditForm(editableScene);
+  const startEditing = useCallback((scene: Scene) => {
+    setEditingId(scene.id);
+    let editableScene = { ...scene };
+    
+    // If in datetime mode and time is not in ISO format, try to convert or set to current time
+    if (settings.timeInputMode === 'datetime' && editableScene.time) {
+      // Check if already in ISO format (contains 'T')
+      if (!editableScene.time.includes('T')) {
+        // Not in ISO format, set to current time as default
+        const now = new Date();
+        editableScene.time = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+        editableScene.timeMode = 'datetime';
+      }
     }
-  }, [scenes]);
+    
+    setEditForm(editableScene);
+  }, [settings.timeInputMode]);
 
   const saveScene = useCallback((shouldClose: boolean = true) => {
     if (!editForm || !editForm.id) return;
@@ -48,12 +59,14 @@ export function useSceneManagement({
     const confirmed = await confirmFn();
     if (confirmed) {
       setScenes(scenes.filter(s => s.id !== id));
-      setEditingId(null);
-      setEditForm({});
+      if (editingId === id) {
+        setEditingId(null);
+        setEditForm({});
+      }
     }
-  }, [scenes, setScenes]);
+  }, [scenes, setScenes, editingId]);
 
-  const addScene = useCallback(() => {
+  const addScene = useCallback((startEditingFn: (scene: Scene) => void) => {
     const newScene: Scene = {
       id: crypto.randomUUID(),
       sceneNo: nextSceneNo,
@@ -70,6 +83,7 @@ export function useSceneManagement({
     };
     setScenes(prev => [...prev, newScene]);
     setNextSceneNo(prev => prev + 1);
+    startEditingFn(newScene);
   }, [nextSceneNo, chapters, setScenes, setNextSceneNo]);
 
   const handleInputChange = useCallback((field: keyof Scene, value: any) => {
@@ -104,6 +118,7 @@ export function useSceneManagement({
   return {
     editingId,
     editForm,
+    setEditForm,
     startEditing,
     saveScene,
     cancelEdit,
