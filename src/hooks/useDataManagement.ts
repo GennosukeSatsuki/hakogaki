@@ -64,8 +64,8 @@ export function useDataManagement({ setScenes }: UseDataManagementProps) {
     }
   }, [newChapterTitle]);
 
-  const updateChapter = useCallback((id: string, newTitle: string) => {
-    setChapters(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+  const updateChapter = useCallback((id: string, updates: Partial<Chapter>) => {
+    setChapters(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
   }, []);
 
   const deleteChapter = useCallback((id: string) => {

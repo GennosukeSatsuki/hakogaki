@@ -31,7 +31,6 @@ import '../App.css';
 import { 
   Scene, 
   Character, 
-  Location, 
   Chapter, 
   AppSettings, 
   DailyProgress, 
@@ -52,7 +51,7 @@ import { EditSceneModal } from '../components/modals/EditSceneModal';
 
 // Custom Hooks (to be integrated)
 // import { useSceneManagement } from '../hooks/useSceneManagement';
-// import { useDataManagement } from '../hooks/useDataManagement';
+import { useDataManagement } from '../hooks/useDataManagement';
 // import { useDragAndDrop } from '../hooks/useDragAndDrop';
 // import { useTimeInput } from '../hooks/useTimeInput';
 
@@ -77,21 +76,15 @@ export default function SceneListPage() {
   const navigate = useNavigate();
   const [initialized, setInitialized] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [lastDeployPath, setLastDeployPath] = useState<string | null>(null);
   const [nextSceneNo, setNextSceneNo] = useState(1);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Scene>>({});
-  const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false); // For character management modal
-  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false); // For location management modal
-  const [isChapterMenuOpen, setIsChapterMenuOpen] = useState(false); // For chapter management modal
-  const [newCharacterName, setNewCharacterName] = useState(''); // For adding new character
-  const [newLocationName, setNewLocationName] = useState(''); // For adding new location
-  const [newChapterTitle, setNewChapterTitle] = useState(''); // For adding new chapter
+  const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false);
+  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+  const [isChapterMenuOpen, setIsChapterMenuOpen] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({ language: 'ja', timeInputMode: 'text', placeInputMode: 'text', autoSave: false, theme: 'system', editorFontFamily: 'sans-serif', editorFontSize: 16, verticalWriting: false });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'outline' | 'editor'>('general');
@@ -101,6 +94,31 @@ export default function SceneListPage() {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
   const [dailyProgress, setDailyProgress] = useState<DailyProgress | null>(null);
+  
+  // Data Management Hook
+  const {
+    characters,
+    setCharacters,
+    newCharacterName,
+    setNewCharacterName,
+    addCharacter,
+    updateCharacter,
+    deleteCharacter,
+    locations,
+    setLocations,
+    newLocationName,
+    setNewLocationName,
+    addLocation,
+    updateLocation,
+    deleteLocation,
+    chapters,
+    setChapters,
+    newChapterTitle,
+    setNewChapterTitle,
+    addChapter,
+    updateChapter,
+    deleteChapter,
+  } = useDataManagement({ setScenes });
   
   // For long-press time picker
   const longPressTimer = useRef<number | null>(null);
@@ -210,30 +228,6 @@ export default function SceneListPage() {
     });
   };
 
-  // Character Management Handlers
-  const addCharacter = async () => {
-    if (newCharacterName && newCharacterName.trim()) {
-      setCharacters(prev => [...prev, { id: crypto.randomUUID(), name: newCharacterName.trim() }]);
-      setNewCharacterName(''); // Clear input
-    }
-  };
-
-  const updateCharacter = (id: string, name: string) => {
-    setCharacters(characters.map(c => c.id === id ? { ...c, name } : c));
-  };
-  
-  const deleteCharacter = async (id: string) => {
-    const confirmed = await ask(t('messages.deleteConfirm'), { title: t('common.confirm'), kind: 'warning' });
-    if (confirmed) {
-      setCharacters(characters.filter(c => c.id !== id));
-      // Remove from scenes as well
-      setScenes(scenes.map(s => ({
-        ...s,
-        characterIds: s.characterIds?.filter(cid => cid !== id)
-      })));
-    }
-  };
-
   const toggleCharacterInScene = (charId: string) => {
     setEditForm(prev => {
       if (!prev.id) return prev;
@@ -254,50 +248,6 @@ export default function SceneListPage() {
         characters: newString
       };
     });
-  };
-
-  // Location Management Handlers
-  const addLocation = async () => {
-    if (newLocationName && newLocationName.trim()) {
-      setLocations(prev => [...prev, { id: crypto.randomUUID(), name: newLocationName.trim() }]);
-      setNewLocationName(''); // Clear input
-    }
-  };
-
-  const updateLocation = (id: string, name: string) => {
-    setLocations(locations.map(l => l.id === id ? { ...l, name } : l));
-  };
-  
-  const deleteLocation = async (id: string) => {
-    const confirmed = await ask(t('messages.deleteConfirm'), { title: t('common.confirm'), kind: 'warning' });
-    if (confirmed) {
-      setLocations(locations.filter(l => l.id !== id));
-    }
-  };
-
-  // Chapter Management Handlers
-  const addChapter = async () => {
-    if (newChapterTitle && newChapterTitle.trim()) {
-      setChapters(prev => [...prev, { 
-        id: crypto.randomUUID(), 
-        title: newChapterTitle.trim(),
-        color: '#5468ff' // Default color
-      }]);
-      setNewChapterTitle(''); // Clear input
-    }
-  };
-
-  const updateChapter = (id: string, updates: Partial<Chapter>) => {
-    setChapters(chapters.map(c => c.id === id ? { ...c, ...updates } : c));
-  };
-  
-  const deleteChapter = async (id: string) => {
-    const confirmed = await ask(`${t('messages.deleteConfirm')}\n${t('messages.deleteChapterDesc')}`, { title: t('common.confirm'), kind: 'warning' });
-    if (confirmed) {
-      setChapters(chapters.filter(c => c.id !== id));
-      // Remove from scenes as well
-      setScenes(scenes.map(s => s.chapterId === id ? { ...s, chapterId: undefined, chapter: '' } : s));
-    }
   };
 
   // Helper functions for time picker long-press
