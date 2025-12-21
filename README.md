@@ -6,13 +6,11 @@ HakoGraph is a "Hakogaki" (plotting/outlining) editor built with Tauri, React, a
 
 I created this tool because I wanted it for my own novel writing process.
 
-## What's New in v1.0.1
+## What's New in v1.0.2
 
-- **Texture Backgrounds**: Added options for paper and chalkboard textures to scene cards and application background.
-- **Chapter Color Customization**: Set unique colors for each chapter with an indicator on scene cards.
-- **Modern UI Components**: Upgraded settings checkboxes to sleek toggle switches.
-- **Completion Stamp**: High-visibility "Completed" stamp for finished scenes.
-- **Improved Mobile Export**: Automatic project-specific folder creation on Android and iOS.
+- **Refactored Architecture**: Migrated to CSS Modules for better component isolation and maintainability.
+- **Unified State Management**: Centralized all data including character count caches into Zustand Store, eliminating direct localStorage calls.
+- **Codebase Cleanup**: Massive reduction of global CSS and inline styles for a modern, clean codebase.
 
 Even if you create a plot in Excel, manual labor is required to turn each scene into a separate file! I wanted to escape that nightmare.
 
