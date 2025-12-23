@@ -4,7 +4,7 @@ import i18n from '../i18n/config';
 import TiptapEditor from '../components/TiptapEditor';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Scene } from '../utils/exportUtils';
+import { Scene, splitContent, getSceneFilePath } from '../utils/exportUtils';
 import { useStoryStore } from '../stores/useStoryStore';
 import styles from './EditorPage.module.css';
 
@@ -35,19 +35,8 @@ export default function EditorPage() {
 
   // 文字数計算ヘルパー
   const getBodyCharCount = useCallback((text: string): number => {
-    const separator = '──────────────(本文執筆完了後に消してください)──────────────';
-    const oldSeparator = '────────────────────────────────';
-    let separatorIndex = text.indexOf(separator);
-    if (separatorIndex === -1) separatorIndex = text.indexOf(oldSeparator);
-    
-    if (separatorIndex !== -1) {
-      const afterSeparator = text.substring(separatorIndex);
-      const bodyStart = afterSeparator.indexOf('\n');
-      if (bodyStart !== -1) {
-        return afterSeparator.substring(bodyStart + 1).length;
-      }
-    }
-    return text.length;
+    const { body } = splitContent(text);
+    return body.length;
   }, []);
 
   // 今日の総進捗計算
@@ -115,17 +104,14 @@ export default function EditorPage() {
         return;
       }
 
-      const chapter = chapters.find(c => c.id === sceneData.deploymentInfo?.chapterId);
-      if (!chapter || chapter.deploymentNumber === undefined) {
+      const path = getSceneFilePath(sceneData, chapters, lastDeployPath);
+      setFilePath(path);
+
+      if (!path) {
         setFileExists(false);
         setLoading(false);
         return;
       }
-
-      const chapterFolder = `${String(chapter.deploymentNumber).padStart(2, '0')}_${chapter.title}`;
-      const fileName = sceneData.deploymentInfo.lastFileName;
-      const path = `${lastDeployPath}/${chapterFolder}/${fileName}`;
-      setFilePath(path);
 
       const existsCheck = await exists(path);
       setFileExists(existsCheck);
@@ -150,7 +136,8 @@ export default function EditorPage() {
         }
 
         // 完了状態の同期
-        const isComp = !fileContent.includes('──────────────');
+        const { hasSeparator } = splitContent(fileContent);
+        const isComp = !hasSeparator;
         if (sceneData.isCompleted !== isComp) {
           updateSceneInStore(id, { isCompleted: isComp });
         }
@@ -201,7 +188,8 @@ export default function EditorPage() {
       const charCount = getBodyCharCount(content);
       updateSceneCharCount(id!, charCount); // Changed: use store action
 
-      const isComp = !content.includes('──────────────');
+      const { hasSeparator } = splitContent(content);
+      const isComp = !hasSeparator;
       updateSceneInStore(id!, { isCompleted: isComp });
       
       alert(t('messages.saved'));
@@ -224,17 +212,14 @@ export default function EditorPage() {
     if (!confirmed) return;
 
     try {
-      const separator = '──────────────(本文執筆完了後に消してください)──────────────';
-      const oldSeparator = '────────────────────────────────';
-      let idx = content.indexOf(separator);
-      if (idx === -1) idx = content.indexOf(oldSeparator);
+      const { body, hasSeparator } = splitContent(content);
       
-      if (idx === -1) {
+      if (!hasSeparator) {
         alert(t('messages.separatorNotFound'));
         return;
       }
 
-      const bodyText = content.substring(idx).split('\n').slice(1).join('\n');
+      const bodyText = body;
       setContent(bodyText);
       await writeTextFile(filePath, bodyText);
       setOriginalContent(bodyText);

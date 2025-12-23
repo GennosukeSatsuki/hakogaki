@@ -93,6 +93,108 @@ export const formatTimeForDisplay = (time: string, mode?: 'text' | 'datetime', l
   return time;
 };
 
+/**
+ * Gets the localized separator string
+ */
+export const getSeparator = (lang: 'en' | 'ja' = 'ja'): string => {
+  const note = lang === 'en' 
+    ? 'Delete after writing is complete' 
+    : '本文執筆完了後に消してください';
+  return `──────────────(${note})──────────────`;
+};
+
+/**
+ * Legacy separators for backward compatibility
+ */
+export const LEGACY_SEPARATORS = [
+  '────────────────────────────────',
+];
+
+/**
+ * Splits file content into metadata (box writing) and body text
+ */
+export const splitContent = (content: string) => {
+  // Heuristic: look for a line of dashes (at least 10 dashes)
+  // We use [─ー-] to match various dash-like characters
+  const separatorMatch = content.match(/^[─ー-]{10,}.*$/m);
+  
+  if (!separatorMatch) {
+    return { metadata: '', body: content, hasSeparator: false, separatorLine: '' };
+  }
+
+  const separatorIndex = separatorMatch.index!;
+  const separatorLine = separatorMatch[0];
+  
+  const metadata = content.substring(0, separatorIndex + separatorLine.length).trim();
+  const body = content.substring(separatorIndex + separatorLine.length).trim();
+
+  return { metadata, body, hasSeparator: true, separatorLine };
+};
+
+/**
+ * Formats the scene metadata section (Box content)
+ */
+export const formatSceneMetadata = (scene: Scene, characters: Character[], lang: 'en' | 'ja' = 'ja'): string => {
+  const i18n = {
+    ja: {
+      place: '場所',
+      time: '時間',
+      characters: '登場人物',
+      aim: '狙いと役割',
+      summary: '詳細なあらすじ',
+      note: '裏設定',
+    },
+    en: {
+      place: 'Place',
+      time: 'Time',
+      characters: 'Characters',
+      aim: 'Aim & Role',
+      summary: 'Summary',
+      note: 'Note',
+    }
+  }[lang];
+
+  const charNames = scene.characterIds?.map(id => characters.find(c => c.id === id)?.name).filter(Boolean).join(', ') || scene.characters;
+
+  return `**${i18n.place}** ${scene.place}
+**${i18n.time}** ${formatTimeForDisplay(scene.time, scene.timeMode, lang)}
+
+**${i18n.characters}** ${charNames}
+
+**${i18n.aim}** ${scene.aim}
+
+**${i18n.summary}** ${scene.summary}
+
+**${i18n.note}** ${scene.note}
+
+${getSeparator(lang)}
+
+`;
+};
+
+/**
+ * Resolves the absolute path for a scene file
+ */
+export const getSceneFilePath = (scene: Scene, chapters: Chapter[], baseDir: string): string | null => {
+  if (!scene.deploymentInfo?.chapterId || !scene.deploymentInfo?.lastFileName) return null;
+
+  const chapter = chapters.find(c => c.id === scene.deploymentInfo?.chapterId);
+  if (!chapter || chapter.deploymentNumber === undefined) return null;
+
+  // Simple path separator detection
+  const isWindows = baseDir.includes('\\\\') || (baseDir.length > 2 && baseDir[1] === ':');
+  const sep = isWindows ? '\\\\' : '/';
+
+  const safeChapterTitle = chapter.title.trim();
+  const chapterFolder = `${String(chapter.deploymentNumber).padStart(2, '0')}_${safeChapterTitle}`;
+  const fileName = scene.deploymentInfo.lastFileName;
+  
+  // Ensure we don't have double separators
+  const cleanBaseDir = baseDir.endsWith('/') || baseDir.endsWith('\\\\') ? baseDir.slice(0, -1) : baseDir;
+
+  return `${cleanBaseDir}${sep}${chapterFolder}${sep}${fileName}`;
+};
+
 
 /**
  * Executes the export (deploy) process for the project.
@@ -102,16 +204,16 @@ export const formatTimeForDisplay = (time: string, mode?: 'text' | 'datetime', l
  */
 export const exportProject = async (data: StoryData, baseDir: string): Promise<{ scenes: Scene[]; chapters: Chapter[] }> => {
   const { scenes, chapters = [], characters = [] } = data;
+  const lang = data.settings?.language || 'ja';
   
-  // Simple separator detection (not perfect but works for most cases provided by dialog)
-  const isWindows = typeof baseDir === 'string' && baseDir.includes('\\\\');
+  // Simple separator detection
+  const isWindows = baseDir.includes('\\\\') || (baseDir.length > 2 && baseDir[1] === ':');
   const sep = isWindows ? '\\\\' : '/';
 
   // Track chapters and assign deployment numbers
   const updatedChapters = [...chapters];
   let nextChapterDeploymentNumber = Math.max(...updatedChapters.map(c => c.deploymentNumber || 0), 0) + 1;
   
-  // Assign deployment numbers to chapters that don't have them yet
   const chapterDeploymentMap = new Map<string, number>();
   for (const chapter of updatedChapters) {
     if (chapter.deploymentNumber) {
@@ -119,162 +221,82 @@ export const exportProject = async (data: StoryData, baseDir: string): Promise<{
     }
   }
   
-  // Track scenes that need deployment info updates
   const updatedScenes = [...scenes];
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     
-    // Localization for export content
-    const i18nExport = {
-      ja: {
-        noChapter: '無題の章',
-        noTitle: '無題のシーン',
-        place: '場所',
-        time: '時間',
-        characters: '登場人物',
-        aim: '狙いと役割',
-        summary: '詳細なあらすじ',
-        note: '裏設定',
-        separatorNote: '本文執筆完了後に消してください'
-      },
-      en: {
-        noChapter: 'Untitled Chapter',
-        noTitle: 'Untitled Scene',
-        place: 'Place',
-        time: 'Time',
-        characters: 'Characters',
-        aim: 'Aim & Role',
-        summary: 'Summary',
-        note: 'Note',
-        separatorNote: 'Delete after writing is complete'
-      }
-    }[data.settings?.language || 'ja'];
-
     // Get current chapter info
     const currentChapterId = scene.chapterId || '';
     const currentChapter = updatedChapters.find(c => c.id === currentChapterId);
-    const currentChapterTitle = currentChapter?.title || scene.chapter || i18nExport.noChapter;
     
-    // File number is always current position
+    // File number is current position
     const fileNumberToUse = i + 1;
 
     // Determine chapter deployment number
     let chapterDeploymentNumber: number;
     let chapterIdToStore: string = currentChapterId;
     
-    if (scene.deploymentInfo) {
-      // Already deployed - get chapter deployment number
-      const deployedChapterId = scene.deploymentInfo.chapterId;
-      
-      if (deployedChapterId === currentChapterId) {
-        // Same chapter - use existing chapter deployment number
-        const deployedChapter = updatedChapters.find(c => c.id === deployedChapterId);
-        chapterDeploymentNumber = deployedChapter?.deploymentNumber || chapterDeploymentMap.get(deployedChapterId) || 0;
-      } else {
-        // Chapter changed - get new chapter's deployment number
-        if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
-          chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
-        } else if (currentChapterId && currentChapter?.deploymentNumber) {
-          chapterDeploymentNumber = currentChapter.deploymentNumber;
-          chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-        } else {
-          // Assign new deployment number to this chapter
-          chapterDeploymentNumber = nextChapterDeploymentNumber++;
-          if (currentChapterId) {
+    if (scene.deploymentInfo && scene.deploymentInfo.chapterId === currentChapterId) {
+        // Already deployed in same chapter
+        chapterDeploymentNumber = currentChapter?.deploymentNumber || chapterDeploymentMap.get(currentChapterId) || 0;
+        
+        // If it was 0 (not assigned), assign now
+        if (chapterDeploymentNumber === 0 && currentChapterId) {
+            chapterDeploymentNumber = nextChapterDeploymentNumber++;
             chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-            const chapterIndex = updatedChapters.findIndex(c => c.id === currentChapterId);
-            if (chapterIndex !== -1) {
-              updatedChapters[chapterIndex] = {
-                ...updatedChapters[chapterIndex],
-                deploymentNumber: chapterDeploymentNumber
-              };
-            }
-          }
+            const idx = updatedChapters.findIndex(c => c.id === currentChapterId);
+            if (idx !== -1) updatedChapters[idx] = { ...updatedChapters[idx], deploymentNumber: chapterDeploymentNumber };
         }
-      }
     } else {
-      // First deployment
-      if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
-        chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
-      } else if (currentChapterId && currentChapter?.deploymentNumber) {
-        chapterDeploymentNumber = currentChapter.deploymentNumber;
-        chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-      } else {
-        // Assign new deployment number to this chapter
-        chapterDeploymentNumber = nextChapterDeploymentNumber++;
-        if (currentChapterId) {
-          chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
-          const chapterIndex = updatedChapters.findIndex(c => c.id === currentChapterId);
-          if (chapterIndex !== -1) {
-            updatedChapters[chapterIndex] = {
-              ...updatedChapters[chapterIndex],
-              deploymentNumber: chapterDeploymentNumber
-            };
-          }
+        // New or changed chapter
+        if (currentChapterId && chapterDeploymentMap.has(currentChapterId)) {
+            chapterDeploymentNumber = chapterDeploymentMap.get(currentChapterId)!;
+        } else if (currentChapterId) {
+            chapterDeploymentNumber = nextChapterDeploymentNumber++;
+            chapterDeploymentMap.set(currentChapterId, chapterDeploymentNumber);
+            const idx = updatedChapters.findIndex(c => c.id === currentChapterId);
+            if (idx !== -1) updatedChapters[idx] = { ...updatedChapters[idx], deploymentNumber: chapterDeploymentNumber };
+        } else {
+            chapterDeploymentNumber = 0;
         }
-      }
     }
 
-    // Create Chapter Folder Name: XX_ChapterName
+    // Path generation
     const numStr = chapterDeploymentNumber.toString().padStart(2, '0');
-    const safeChapterTitle = currentChapterTitle.trim();
+    const safeChapterTitle = (currentChapter?.title || scene.chapter || (lang === 'ja' ? '無題の章' : 'Untitled Chapter')).trim();
     const folderName = `${numStr}_${safeChapterTitle}`;
-    const folderPath = `${baseDir}${sep}${folderName}`;
+    const folderPath = `${baseDir.replace(/[/\\]+$/, '')}${sep}${folderName}`;
 
-    // Create Directory
     await mkdir(folderPath, { recursive: true });
 
-    // Create File Name: (FileNum)_(SceneName).txt
     const fileNum = fileNumberToUse.toString().padStart(3, '0');
-    const safeTitle = scene.title.trim() || i18nExport.noTitle;
+    const safeTitle = scene.title.trim() || (lang === 'ja' ? '無題のシーン' : 'Untitled Scene');
     const fileName = `${fileNum}_${safeTitle}.txt`;
     const filePath = `${folderPath}${sep}${fileName}`;
     
-    // Check if chapter changed (need to move file)
-    if (scene.deploymentInfo && scene.deploymentInfo.chapterId !== chapterIdToStore) {
-      // Chapter changed - need to move file from old chapter folder to new chapter folder
-      const oldChapterId = scene.deploymentInfo.chapterId;
-      const oldChapter = updatedChapters.find(c => c.id === oldChapterId);
-      const oldChapterDeploymentNumber = oldChapter?.deploymentNumber || chapterDeploymentMap.get(oldChapterId) || 0;
-      const oldChapterTitle = oldChapter?.title || i18nExport.noChapter;
-      
-      const oldNumStr = oldChapterDeploymentNumber.toString().padStart(2, '0');
-      const oldFolderName = `${oldNumStr}_${oldChapterTitle.trim()}`;
-      const oldFolderPath = `${baseDir}${sep}${oldFolderName}`;
-      const oldFileName = scene.deploymentInfo.lastFileName || fileName;
-      const oldFilePath = `${oldFolderPath}${sep}${oldFileName}`;
-      
-      // Read old file content if it exists
-      if (await exists(oldFilePath)) {
-        console.log(`Moving file from ${oldFolderName}/${oldFileName} to ${folderName}/${fileName}`);
+    // Rename/Move logic
+    if (scene.deploymentInfo) {
+      const oldPath = getSceneFilePath(scene, updatedChapters, baseDir);
+      if (oldPath && oldPath !== filePath && await exists(oldPath)) {
+        console.log(`Moving/Renaming from ${oldPath} to ${filePath}`);
         try {
-          const fileContent = await readTextFile(oldFilePath);
-          // Write to new location
-          await writeTextFile(filePath, fileContent);
-          // Delete old file
-          await remove(oldFilePath);
+          if (scene.deploymentInfo.chapterId !== currentChapterId) {
+            // Chapter change
+            const content = await readTextFile(oldPath);
+            await writeTextFile(filePath, content);
+            await remove(oldPath);
+          } else {
+            // Only title change
+            await rename(oldPath, filePath);
+          }
         } catch (e) {
-          console.error(`Failed to move file: ${e}`);
-          // Continue anyway - will create new file if move fails
-        }
-      }
-    }
-    // Check if file needs to be renamed (title changed, same chapter)
-    else if (scene.deploymentInfo && scene.deploymentInfo.lastFileName && scene.deploymentInfo.lastFileName !== fileName) {
-      const oldFilePath = `${folderPath}${sep}${scene.deploymentInfo.lastFileName}`;
-      if (await exists(oldFilePath)) {
-        console.log(`Renaming: ${scene.deploymentInfo.lastFileName} -> ${fileName}`);
-        try {
-          await rename(oldFilePath, filePath);
-        } catch (e) {
-          console.error(`Failed to rename file: ${e}`);
-          // Continue anyway - will create new file if rename fails
+          console.error(`File operation failed: ${e}`);
         }
       }
     }
     
-    // Update deployment info with current file name
+    // Update deployment info
     updatedScenes[i] = {
       ...updatedScenes[i],
       deploymentInfo: {
@@ -283,73 +305,38 @@ export const exportProject = async (data: StoryData, baseDir: string): Promise<{
       }
     };
     
-    // Create box-writing metadata content with separator note
-    const separator = `──────────────(${i18nExport.separatorNote})──────────────`;
-    const boxContent = `**${i18nExport.place}** ${scene.place}
-**${i18nExport.time}** ${formatTimeForDisplay(scene.time, scene.timeMode, data.settings?.language)}
-
-**${i18nExport.characters}** ${scene.characterIds?.map(id => characters.find(c => c.id === id)?.name).filter(Boolean).join(', ') || scene.characters}
-
-**${i18nExport.aim}** ${scene.aim}
-
-**${i18nExport.summary}** ${scene.summary}
-
-**${i18nExport.note}** ${scene.note}
-
-${separator}
-
-`;
-
-    let shouldWrite = true;
+    // Prepare content
+    const boxContent = formatSceneMetadata(updatedScenes[i], characters, lang);
     let finalContent = boxContent;
+    let shouldWrite = true;
 
-    // If file already exists, read existing content and compare
     if (await exists(filePath)) {
       try {
         const existingContent = await readTextFile(filePath);
+        const { body, hasSeparator, separatorLine } = splitContent(existingContent);
         
-        // Find separator line (check for both old and new format)
-        // Heuristic: any line starting with 14 dashes is considered a separator
-        const separatorLine = '──────────────';
-        
-        let separatorIndex = existingContent.indexOf(separatorLine);
-        
-        if (separatorIndex === -1) {
-          // Separator not found - file is marked as complete
-          updatedScenes[i] = { ...updatedScenes[i], isCompleted: true };
-          shouldWrite = false; // Never overwrite completed files
+        if (!hasSeparator) {
+          updatedScenes[i].isCompleted = true;
+          shouldWrite = false;
         } else {
-          updatedScenes[i] = { ...updatedScenes[i], isCompleted: false };
-          // Find the exact separator string used (until newline)
-          const endOfLine = existingContent.indexOf('\n', separatorIndex);
-          const foundSeparator = endOfLine !== -1 
-            ? existingContent.substring(separatorIndex, endOfLine).trim()
-            : existingContent.substring(separatorIndex).trim();
+          updatedScenes[i].isCompleted = false;
           
-          // Separator found - file is still in draft mode
-          // Extract existing box-writing section (before separator)
-          const existingBoxContent = existingContent.substring(0, separatorIndex + foundSeparator.length + 1);
+          // Re-normalize for comparison
+          const currentSeparator = getSeparator(lang);
+          const normalizedExistingMetadata = existingContent.substring(0, existingContent.indexOf(separatorLine) + separatorLine.length)
+                                              .replace(separatorLine, currentSeparator).trim();
           
-          // Extract body content (after separator)
-          const bodyContent = existingContent.substring(separatorIndex).replace(new RegExp(`^${foundSeparator.replace(/[()]/g, '\\\\$&')}\\s*\\n+`), '');
-          
-          // Compare box-writing sections (normalize separator for comparison)
-          const normalizedExisting = existingBoxContent.replace(foundSeparator, separator).trim();
-          const normalizedNew = boxContent.trim();
-          
-          if (normalizedExisting === normalizedNew) {
+          if (normalizedExistingMetadata === boxContent.trim()) {
             shouldWrite = false;
           } else {
-            finalContent = boxContent + bodyContent;
+            finalContent = boxContent + (body ? '\n' + body : '');
           }
         }
       } catch (e) {
         console.error(`Error reading existing file: ${fileName}`, e);
-        // If read fails, write new content
       }
     }
 
-    // Only write if needed
     if (shouldWrite) {
       await writeTextFile(filePath, finalContent);
     }
