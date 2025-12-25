@@ -61,6 +61,7 @@
       "light": "Light",
       "dark": "Dark"
     },
+    "sceneFontSize": "Scene Input Font Size (px)",
     "autoSave": {
       "label": "Auto Save",
       "description": "Automatically overwrite the file when modified (2s after typing stops)."

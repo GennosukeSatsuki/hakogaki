@@ -53,6 +53,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system', 
   editorFontFamily: 'sans-serif', 
   editorFontSize: 16, 
+  sceneFontSize: 16,
   verticalWriting: false,
   enabledPlugins: ['vertical-writing', 'texture-background'] 
 };

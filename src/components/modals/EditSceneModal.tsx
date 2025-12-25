@@ -59,6 +59,7 @@ export function EditSceneModal({
               value={editForm.title || ''}
               onChange={e => handleInputChange('title', e.target.value)}
               placeholder={t('scene.placeholder.title')}
+              style={{ fontSize: `${settings.sceneFontSize}px` }}
             />
           </div>
           <div className={styles.row2Col}>
@@ -241,6 +242,7 @@ export function EditSceneModal({
                 <input
                   value={editForm.time}
                   onChange={e => handleInputChange('time', e.target.value)}
+                  style={{ fontSize: `${settings.sceneFontSize}px` }}
                 />
               )}
             </div>
@@ -261,6 +263,7 @@ export function EditSceneModal({
                 <input
                   value={editForm.place}
                   onChange={e => handleInputChange('place', e.target.value)}
+                  style={{ fontSize: `${settings.sceneFontSize}px` }}
                 />
               )}
             </div>
@@ -288,6 +291,7 @@ export function EditSceneModal({
               value={editForm.aim}
               onChange={e => handleInputChange('aim', e.target.value)}
               rows={2}
+              style={{ fontSize: `${settings.sceneFontSize}px` }}
             />
           </div>
           {/* Summary */}
@@ -298,6 +302,7 @@ export function EditSceneModal({
               onChange={e => handleInputChange('summary', e.target.value)}
               rows={5}
               placeholder={t('scene.placeholder.summary')}
+              style={{ fontSize: `${settings.sceneFontSize}px` }}
             />
           </div>
           {/* Note */}
@@ -308,7 +313,7 @@ export function EditSceneModal({
               onChange={e => handleInputChange('note', e.target.value)}
               rows={3}
               className="note-input"
-              style={{ fontFamily: 'monospace', opacity: 0.9 }}
+              style={{ fontFamily: 'monospace', opacity: 0.9, fontSize: `${settings.sceneFontSize}px` }}
               placeholder={t('scene.placeholder.note')}
             />
           </div>

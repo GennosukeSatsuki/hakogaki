@@ -108,6 +108,17 @@ export function SettingsModal({
               </div>
 
               <div className={styles.formGroup}>
+                <label>{t('settings.sceneFontSize')}</label>
+                <input 
+                  type="number" 
+                  min="10" 
+                  max="72"
+                  value={settings.sceneFontSize || 16}
+                  onChange={(e) => onSettingsChange({ ...settings, sceneFontSize: parseInt(e.target.value) || 16 })}
+                />
+              </div>
+
+              <div className={styles.formGroup}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <label>{t('settings.autoSave.label')}</label>
                   <label className="toggle-switch">

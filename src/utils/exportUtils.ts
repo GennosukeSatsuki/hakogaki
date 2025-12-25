@@ -50,6 +50,7 @@ export interface AppSettings {
   theme: 'system' | 'light' | 'dark';
   editorFontFamily?: string;
   editorFontSize?: number;
+  sceneFontSize?: number;
   verticalWriting?: boolean;
   useTextureBackground?: boolean;
   enabledPlugins?: string[];
@@ -113,22 +114,28 @@ export const LEGACY_SEPARATORS = [
 /**
  * Splits file content into metadata (box writing) and body text
  */
-export const splitContent = (content: string) => {
-  // Heuristic: look for a line of dashes (at least 10 dashes)
-  // We use [─ー-] to match various dash-like characters
-  const separatorMatch = content.match(/^[─ー-]{10,}.*$/m);
+export const splitContent = (content: string): { metadata: string; body: string; hasSeparator: boolean; separatorLine: string; separatorIndex?: number } => {
+  // Specifically look for HakoGraph separator with parentheses content
+  // We look for characters commonly used in the separator
+  const pattern = /^[─ー-]{5,}\(.*\)[─ー-]{5,}$/m;
+  let match = content.match(pattern);
   
-  if (!separatorMatch) {
+  // Fallback to the generic dashed line if not found
+  if (!match) {
+    match = content.match(/^[─ー-]{10,}.*$/m);
+  }
+  
+  if (!match) {
     return { metadata: '', body: content, hasSeparator: false, separatorLine: '' };
   }
 
-  const separatorIndex = separatorMatch.index!;
-  const separatorLine = separatorMatch[0];
+  const index = match.index!;
+  const line = match[0];
   
-  const metadata = content.substring(0, separatorIndex + separatorLine.length).trim();
-  const body = content.substring(separatorIndex + separatorLine.length).trim();
+  const metadata = content.substring(0, index + line.length).trim();
+  const body = content.substring(index + line.length).trim();
 
-  return { metadata, body, hasSeparator: true, separatorLine };
+  return { metadata, body, hasSeparator: true, separatorLine: line, separatorIndex: index };
 };
 
 /**
@@ -313,7 +320,7 @@ export const exportProject = async (data: StoryData, baseDir: string): Promise<{
     if (await exists(filePath)) {
       try {
         const existingContent = await readTextFile(filePath);
-        const { body, hasSeparator, separatorLine } = splitContent(existingContent);
+        const { body, hasSeparator, separatorLine, separatorIndex } = splitContent(existingContent);
         
         if (!hasSeparator) {
           updatedScenes[i].isCompleted = true;
@@ -323,13 +330,15 @@ export const exportProject = async (data: StoryData, baseDir: string): Promise<{
           
           // Re-normalize for comparison
           const currentSeparator = getSeparator(lang);
-          const normalizedExistingMetadata = existingContent.substring(0, existingContent.indexOf(separatorLine) + separatorLine.length)
+          // separatorIndex is guaranteed to be present if hasSeparator is true
+          const normalizedExistingMetadata = existingContent.substring(0, (separatorIndex ?? 0) + separatorLine.length)
                                               .replace(separatorLine, currentSeparator).trim();
           
           if (normalizedExistingMetadata === boxContent.trim()) {
             shouldWrite = false;
           } else {
-            finalContent = boxContent + (body ? '\n' + body : '');
+            // boxContent already ends with \n\n, so we can just append body
+            finalContent = boxContent + (body || '');
           }
         }
       } catch (e) {
