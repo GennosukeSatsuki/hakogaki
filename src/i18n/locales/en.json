@@ -101,7 +101,9 @@
     },
     "about": {
       "title": "About HakoGraph",
-      "description": "Simple and easy-to-use\nplotting and writing tool"
+      "description": "Simple and easy-to-use\nplotting and writing tool",
+      "licenses": "Open Source Licenses",
+      "licensesDesc": "This application uses the following open source software:"
     },
     "character": {
       "title": "Character Settings",

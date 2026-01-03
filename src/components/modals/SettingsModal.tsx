@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppSettings } from '../../utils/exportUtils';
 import { AVAILABLE_PLUGINS } from '../../plugins/registry';
@@ -285,27 +286,106 @@ interface AboutModalProps {
   onClose: () => void;
 }
 
+const THIRD_PARTY_LICENSES = [
+  { name: 'React', license: 'MIT', url: 'https://github.com/facebook/react' },
+  { name: 'Tauri', license: 'MIT/Apache-2.0', url: 'https://github.com/tauri-apps/tauri' },
+  { name: '@dnd-kit', license: 'MIT', url: 'https://github.com/clauderic/dnd-kit' },
+  { name: 'Tiptap', license: 'MIT', url: 'https://github.com/ueberdosis/tiptap' },
+  { name: 'i18next', license: 'MIT', url: 'https://github.com/i18next/i18next' },
+  { name: 'Zustand', license: 'MIT', url: 'https://github.com/pmndrs/zustand' },
+  { name: 'React Router', license: 'MIT', url: 'https://github.com/remix-run/react-router' },
+];
+
 export function AboutModal({ isOpen, appVersion, onClose }: AboutModalProps) {
   const { t } = useTranslation();
+  const [showLicenses, setShowLicenses] = useState(false);
 
   if (!isOpen) return null;
 
   return (
     <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} style={{ maxWidth: '400px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.modalContent} style={{ maxWidth: '450px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ padding: '2rem 1rem 1rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>HakoGraph</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Version {appVersion}</p>
           
-          <p style={{ fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+          <p style={{ fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
             {t('modals.about.description').split('\n').map((line, i) => (
               <span key={i}>{line}<br/></span>
             ))}
           </p>
           
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
             &copy; 2025 Gennosuke Satsuki
           </p>
+
+          {/* License Section */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', textAlign: 'left' }}>
+            <button
+              onClick={() => setShowLicenses(!showLicenses)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                padding: '0.5rem 0',
+                width: '100%',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <span style={{ transform: showLicenses ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▶</span>
+              {t('modals.about.licenses')}
+            </button>
+            
+            {showLicenses && (
+              <div style={{ 
+                marginTop: '0.5rem', 
+                padding: '0.75rem',
+                background: 'var(--bg-tertiary)',
+                borderRadius: '6px',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  {t('modals.about.licensesDesc')}
+                </p>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {THIRD_PARTY_LICENSES.map((lib) => (
+                    <li key={lib.name} style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      padding: '0.4rem 0',
+                      borderBottom: '1px solid var(--border-color)',
+                      fontSize: '0.8rem'
+                    }}>
+                      <a 
+                        href={lib.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--primary)', textDecoration: 'none' }}
+                      >
+                        {lib.name}
+                      </a>
+                      <span style={{ 
+                        color: 'var(--text-muted)', 
+                        fontSize: '0.75rem',
+                        background: 'var(--bg-secondary)',
+                        padding: '0.15rem 0.4rem',
+                        borderRadius: '3px'
+                      }}>
+                        {lib.license}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
         <div className={styles.modalActions} style={{ justifyContent: 'center', borderTop: 'none' }}>
           <button className="primary" onClick={onClose} style={{ minWidth: '120px', marginBottom: '1.5rem' }}>{t('common.close')}</button>
