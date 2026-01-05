@@ -180,6 +180,7 @@ export function useFileManagement({
           setChapters(newChapters);
           const maxSceneNo = Math.max(...newScenes.map(s => s.sceneNo || 0), 0);
           setNextSceneNo(maxSceneNo + 1);
+          setLastDeployPath(null);
 
           alert(t('messages.migrationSuccess'));
         } else if (parsed.scenes && parsed.characters) {
@@ -214,7 +215,7 @@ export function useFileManagement({
           setChapters(loadedChapters);
           if (parsed.locations) setLocations(parsed.locations);
           if (parsed.settings) setSettings(parsed.settings);
-          if (parsed.lastDeployPath) setLastDeployPath(parsed.lastDeployPath);
+          setLastDeployPath(parsed.lastDeployPath || null);
           
           if (parsed.nextSceneNo) {
             setNextSceneNo(parsed.nextSceneNo);
