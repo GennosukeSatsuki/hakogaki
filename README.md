@@ -1,5 +1,10 @@
 # HakoGraph
 
+> [!IMPORTANT]
+> **移転のお知らせ / Notice**
+> 
+> Tauriでの開発は縦書きが環境でかなり変わるので、Electron環境で新たに **[HackWriter](https://github.com/GennosukeSatsuki/HackWriter)** として再出発しています。
+
 [English] | [日本語](README.ja.md)
 
 HakoGraph is a "Hakogaki" (plotting/outlining) editor built with Tauri, React, and TypeScript.

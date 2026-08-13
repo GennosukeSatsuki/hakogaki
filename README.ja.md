@@ -1,5 +1,10 @@
 # HakoGraph
 
+> [!IMPORTANT]
+> **移転のお知らせ**
+> 
+> Tauriでの開発は縦書きが環境でかなり変わるので、Electron環境で新たに **[HackWriter](https://github.com/GennosukeSatsuki/HackWriter)** として再出発しています。
+> 
 [English](README.md) | [日本語]
 
 Tauri + React + TypeScript で構築された箱書きエディタ「HakoGraph」です。
